@@ -34,14 +34,14 @@ jobs:
       - name: Unit tests, lint and debug build
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports
           path: app/build/reports/
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
