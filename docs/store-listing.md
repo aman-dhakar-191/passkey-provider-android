@@ -29,9 +29,10 @@ Set up: install, then choose Passkey Vault under Settings → Passwords, passkey
 
 ## Category and contact
 - Category: Tools (or Productivity)
-- Contact email: (add yours)
+- Contact email: amandhaker191@gmail.com
 - Website: https://aman-dhakar-191.github.io/passkey-provider-android/
 - Privacy policy URL: https://aman-dhakar-191.github.io/passkey-provider-android/privacy/
+- Terms of use URL: https://aman-dhakar-191.github.io/passkey-provider-android/terms/
 
 ## Google Play "Data safety" answers (store build)
 - Does the app collect or share any of the required user data types? **No**

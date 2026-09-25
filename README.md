@@ -105,11 +105,12 @@ package installer, WorkManager or the GitHub API. To prove the check itself work
 that the same things *are* found in the GitHub build.
 
 Store listing text, Data-safety answers and signing notes are in
-[docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md).
+[docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md) and the terms of use are [TERMS.md](TERMS.md).
 
 **Website:** https://aman-dhakar-191.github.io/passkey-provider-android/, with the privacy policy at
-[`/privacy/`](https://aman-dhakar-191.github.io/passkey-provider-android/privacy/). It's built from `site/`,
-`PRIVACY.md` and the store screenshots by `scripts/build_site.py`, and deployed by the *Website*
+[`/privacy/`](https://aman-dhakar-191.github.io/passkey-provider-android/privacy/) and the terms at
+[`/terms/`](https://aman-dhakar-191.github.io/passkey-provider-android/terms/). It's built from `site/`,
+`PRIVACY.md`, `TERMS.md` and the store screenshots by `scripts/build_site.py`, and deployed by the *Website*
 workflow on every change to `main`. Its "last changed" dates come from git, so edit `PRIVACY.md` and the
 date updates itself.
 
@@ -172,3 +173,7 @@ above.
 - Attestation is always `none`. Sites that require enterprise attestation will reject the passkey.
 - The browser rpId check allows the origin's host or any parent domain. It doesn't consult the
   public-suffix list, but browsers already block RP IDs that are public suffixes.
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE). The licence doesn't cover the "Passkey Vault" name or logo.
