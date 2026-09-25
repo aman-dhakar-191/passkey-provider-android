@@ -47,6 +47,10 @@ class MainActivity : FragmentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             if (savedInstanceState == null) checkForUpdate(quiet = true)
         }
+        // Used by the emulator test in CI (scripts/emulator_selftest.py); debug builds only.
+        if (BuildConfig.DEBUG && savedInstanceState == null && intent.getBooleanExtra(EXTRA_RUN_SELF_TEST, false)) {
+            lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) }
+        }
         val store = PasskeyStore.get(this)
         setContent {
             PasskeyTheme {
@@ -183,6 +187,8 @@ class MainActivity : FragmentActivity() {
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }
+
+private const val EXTRA_RUN_SELF_TEST = "run_self_test"
 
 sealed interface UpdateState {
     data object Idle : UpdateState
