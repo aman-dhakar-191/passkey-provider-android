@@ -17,6 +17,7 @@ import io.github.amandhakar.passkey.webauthn.WebAuthnEncoding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 /** Invisible activity that verifies the caller and the user, then creates the passkey. */
 class CreatePasskeyActivity : FragmentActivity() {
@@ -51,6 +52,12 @@ class CreatePasskeyActivity : FragmentActivity() {
             ?: throw CreateCredentialUnknownException("No request")
         val pkRequest = request.callingRequest as? CreatePublicKeyCredentialRequest
             ?: throw CreateCredentialUnknownException("Only passkeys are supported")
+        ProviderErrors.note(
+            this,
+            "Create started by ${request.callingAppInfo.packageName} " +
+                "(origin given: ${request.callingAppInfo.isOriginPopulated()}, " +
+                "client data hash: ${pkRequest.clientDataHash != null})\n" + requestSummary(pkRequest.requestJson),
+        )
         val options = CreationOptions.parse(pkRequest.requestJson)
         val verifier = CallerVerifier(this)
 
@@ -73,8 +80,24 @@ class CreatePasskeyActivity : FragmentActivity() {
         if (!verifyUser("Create a passkey", "for ${options.userName.ifBlank { rpId }} on $rpId")) {
             throw CreateCredentialCancellationException("User cancelled")
         }
-        return withContext(Dispatchers.Default) {
+        val response = withContext(Dispatchers.Default) {
             Authenticator(this@CreatePasskeyActivity).register(options, rpId, origin)
         }
+        ProviderErrors.note(this, "Passkey created for $rpId (origin $origin), returned ${response.length} bytes")
+        return response
+    }
+
+    /** Only the request fields that affect whether a passkey can be made; no challenge or user id. */
+    private fun requestSummary(json: String): String = runCatching {
+        val o = JSONObject(json)
+        JSONObject()
+            .put("rp", o.optJSONObject("rp"))
+            .put("pubKeyCredParams", o.optJSONArray("pubKeyCredParams"))
+            .put("authenticatorSelection", o.optJSONObject("authenticatorSelection"))
+            .put("attestation", o.opt("attestation"))
+            .put("excludeCredentials", o.optJSONArray("excludeCredentials")?.length() ?: 0)
+            .put("extensions", o.optJSONObject("extensions"))
+            .toString()
+    }.getOrElse { "unparsable request: ${it.message}" }
     }
 }

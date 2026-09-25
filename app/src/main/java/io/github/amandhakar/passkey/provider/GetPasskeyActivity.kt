@@ -69,8 +69,13 @@ class GetPasskeyActivity : FragmentActivity() {
         if (!verifyUser("Sign in with passkey", "${passkey.userName} on ${passkey.rpId}")) {
             throw GetCredentialCancellationException("User cancelled")
         }
-        return withContext(Dispatchers.Default) {
+        val response = withContext(Dispatchers.Default) {
             Authenticator(this@GetPasskeyActivity).authenticate(passkey, options, origin, option.clientDataHash)
         }
+        ProviderErrors.note(
+            this,
+            "Signed in to ${passkey.rpId} for ${request.callingAppInfo.packageName} (origin $origin)",
+        )
+        return response
     }
 }

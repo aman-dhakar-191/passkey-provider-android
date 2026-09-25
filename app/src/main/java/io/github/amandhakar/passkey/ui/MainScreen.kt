@@ -136,11 +136,10 @@ private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit) {
 private fun ProblemsCard(text: String, onCopy: () -> Unit, onClear: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Recent problems", style = MaterialTheme.typography.titleMedium)
+            Text("Passkey activity log", style = MaterialTheme.typography.titleMedium)
             Text(
-                text.lineSequence().take(3).joinToString("\n"),
+                text.lineSequence().take(4).joinToString("\n"),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onCopy) { Text("Copy details") }

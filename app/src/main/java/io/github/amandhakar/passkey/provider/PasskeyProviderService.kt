@@ -52,6 +52,7 @@ class PasskeyProviderService : CredentialProviderService() {
             userName.ifBlank { getString(R.string.app_name) },
             pendingIntent(CreatePasskeyActivity::class.java, null),
         ).setDescription(getString(R.string.create_entry_description)).build()
+        ProviderErrors.note(this, "Create offered to ${request.callingAppInfo?.packageName ?: "unknown caller"}")
         callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
     }
 
@@ -81,6 +82,13 @@ class PasskeyProviderService : CredentialProviderService() {
                         .setLastUsedTime(Instant.ofEpochMilli(passkey.lastUsedAt))
                         .build()
                 }
+        }
+        if (request.beginGetCredentialOptions.any { it is BeginGetPublicKeyCredentialOption }) {
+            ProviderErrors.note(
+                this,
+                "Sign-in asked by ${request.callingAppInfo?.packageName ?: "unknown caller"}: " +
+                    "${entries.size} passkey(s) offered",
+            )
         }
         callback.onResult(BeginGetCredentialResponse(credentialEntries = entries))
     }
