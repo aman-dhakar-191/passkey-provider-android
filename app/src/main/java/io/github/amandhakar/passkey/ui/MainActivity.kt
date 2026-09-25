@@ -59,6 +59,7 @@ class MainActivity : FragmentActivity() {
                     versionName = BuildConfig.VERSION_NAME,
                     onOpenProviderSettings = ::openProviderSettings,
                     onScanQr = ::scanQr,
+                    onSelfTest = { lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) } },
                     onDelete = ::deletePasskey,
                     onCheckUpdate = { checkForUpdate(quiet = false) },
                     onInstallUpdate = ::installUpdate,

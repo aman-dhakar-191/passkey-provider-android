@@ -50,6 +50,7 @@ fun MainScreen(
     versionName: String,
     onOpenProviderSettings: () -> Unit,
     onScanQr: () -> Unit,
+    onSelfTest: () -> Unit,
     onDelete: (Passkey) -> Unit,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: (Release) -> Unit,
@@ -71,7 +72,7 @@ fun MainScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ProviderCard(providerEnabled, onOpenProviderSettings) }
+            item { ProviderCard(providerEnabled, onOpenProviderSettings, onSelfTest) }
             problems?.let { text -> item { ProblemsCard(text, onCopyProblems, onClearProblems) } }
             item { CrossDeviceCard(onScanQr) }
             if (updatesEnabled) item { UpdateCard(updateState, versionName, onCheckUpdate, onInstallUpdate) }
@@ -115,7 +116,7 @@ fun MainScreen(
 }
 
 @Composable
-private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit) {
+private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit, onSelfTest: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -128,6 +129,7 @@ private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (!enabled) Button(onClick = onOpenSettings) { Text("Open settings") }
+            OutlinedButton(onClick = onSelfTest) { Text("Test creating a passkey") }
         }
     }
 }
