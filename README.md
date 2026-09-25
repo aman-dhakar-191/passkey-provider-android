@@ -61,14 +61,14 @@ Debug builds use the package `io.github.amandhakar.passkey.debug` and have self-
    Under *Settings → Secrets and variables → Actions*, add these secrets:
    `KEYSTORE_BASE64` (the base64 output), `KEYSTORE_PASSWORD`, `KEY_ALIAS` (`passkey`) and `KEY_PASSWORD`.
 
-2. **For each release, push a version tag:**
+2. **For each release:** go to **Actions → Release → Run workflow** and pick the kind of change:
+   - `patch`: fixes (1.0.2 → 1.0.3)
+   - `minor`: new features (1.0.2 → 1.1.0)
+   - `major`: big changes (1.0.2 → 2.0.0)
 
-   ```bash
-   git tag v1.0.0 && git push origin v1.0.0
-   ```
-
-   You can also run the **Release** workflow manually and enter a version. The workflow runs the
-   tests, builds and signs the APK, and publishes a GitHub release with the APK and its SHA-256.
+   The workflow works out the next number from the latest release. You can also type an exact
+   version, or push a tag (`git tag v1.0.0 && git push origin v1.0.0`). It runs the tests, builds and
+   signs the APK, and publishes a GitHub release with the APK and its SHA-256.
 
 The version must be `MAJOR.MINOR.PATCH`, with each part between 0 and 99. The `versionCode` is
 derived from it, so it always goes up.
