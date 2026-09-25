@@ -1,7 +1,5 @@
 # Privacy policy: Passkey Vault
 
-_Last updated: 2026-09-25_
-
 Passkey Vault is a passkey manager for Android. It stores passkeys **only on your device** and has no
 account, server or analytics.
 
