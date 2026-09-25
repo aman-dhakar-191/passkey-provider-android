@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
+import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.credentials.exceptions.ClearCredentialException
@@ -67,7 +68,9 @@ class PasskeyProviderService : CredentialProviderService() {
                 userName.ifBlank { getString(R.string.app_name) },
                 pendingIntent(CreatePasskeyActivity::class.java, null),
             ).setDescription(getString(R.string.create_entry_description))
-                .apply { sheetBiometricPrompt()?.let { setBiometricPromptData(it) } }
+                .apply {
+                    if (Build.VERSION.SDK_INT >= 35) sheetBiometricPrompt()?.let { setBiometricPromptData(it) }
+                }
                 .build()
             callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
             ProviderErrors.note(this, "Create offered to the system")
@@ -121,7 +124,9 @@ class PasskeyProviderService : CredentialProviderService() {
                         option,
                     )
                         .setDisplayName(passkey.label.ifBlank { passkey.displayName }.ifBlank { null })
-                        .apply { sheetBiometricPrompt()?.let { setBiometricPromptData(it) } }
+                        .apply {
+                    if (Build.VERSION.SDK_INT >= 35) sheetBiometricPrompt()?.let { setBiometricPromptData(it) }
+                }
                         .setLastUsedTime(Instant.ofEpochMilli(passkey.lastUsedAt))
                         .build()
                 }
@@ -132,10 +137,10 @@ class PasskeyProviderService : CredentialProviderService() {
     /**
      * Android 15+ can show the fingerprint / screen-lock prompt inside its own passkey sheet, so picking a
      * passkey and verifying is one step. Strong biometrics or the device credential only: those are what
-     * unlock the passkey keys in the Keystore. Older Android: null, and the activity shows its own prompt.
+     * unlock the passkey keys in the Keystore. On older Android the activity shows its own prompt.
      */
+    @RequiresApi(35)
     private fun sheetBiometricPrompt(): BiometricPromptData? {
-        if (Build.VERSION.SDK_INT < 35) return null
         if (!getSystemService(KeyguardManager::class.java).isDeviceSecure) return null
         return BiometricPromptData.Builder()
             .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
