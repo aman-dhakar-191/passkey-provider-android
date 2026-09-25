@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -20,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.data.Passkey
+import io.github.amandhakar.passkey.data.PasskeyGroups
 import io.github.amandhakar.passkey.update.Release
 import kotlinx.coroutines.flow.StateFlow
 import java.text.DateFormat
@@ -53,6 +57,7 @@ fun MainScreen(
     onScanQr: () -> Unit,
     onSelfTest: () -> Unit,
     onDelete: (Passkey) -> Unit,
+    onRename: (Passkey, String) -> Unit,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: (Release) -> Unit,
     onCopyProblems: () -> Unit,
@@ -61,8 +66,11 @@ fun MainScreen(
     val passkeys by passkeysFlow.collectAsState()
     val problems by problemsFlow.collectAsState()
     var pendingDelete by remember { mutableStateOf<Passkey?>(null) }
+    var pendingRename by remember { mutableStateOf<Passkey?>(null) }
+    var query by remember { mutableStateOf("") }
+    val groups = remember(passkeys, query) { PasskeyGroups.of(passkeys, query) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Passkeys") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Passkey Vault") }) }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -91,11 +99,58 @@ fun MainScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            } else if (passkeys.size > 3) {
+                item {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        placeholder = { Text("Search sites, accounts and names") },
+                    )
+                }
+                if (groups.isEmpty()) item { Text("No passkeys match \"$query\".") }
             }
-            items(passkeys.sortedBy { it.rpId }, key = { it.credentialId }) { passkey ->
-                PasskeyRow(passkey, onDelete = { pendingDelete = passkey })
+            groups.forEach { group ->
+                item(key = "site:${group.rpId}") {
+                    Column(Modifier.padding(top = 4.dp)) {
+                        Text(group.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        if (group.title != group.rpId) Text(group.rpId, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                items(group.passkeys, key = { it.credentialId }) { passkey ->
+                    PasskeyRow(passkey, onRename = { pendingRename = passkey }, onDelete = { pendingDelete = passkey })
+                }
             }
         }
+    }
+
+    pendingRename?.let { passkey ->
+        var name by remember(passkey.credentialId) { mutableStateOf(passkey.label) }
+        AlertDialog(
+            onDismissRequest = { pendingRename = null },
+            title = { Text("Name this passkey") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${passkey.userName.ifBlank { passkey.displayName }} on ${passkey.rpId}. " +
+                            "The name is only shown on this phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.take(60) },
+                        singleLine = true,
+                        placeholder = { Text("e.g. Work account") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pendingRename = null; onRename(passkey, name) }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { pendingRename = null }) { Text("Cancel") } },
+        )
     }
 
     pendingDelete?.let { passkey ->
@@ -210,15 +265,17 @@ private fun UpdateCard(
 }
 
 @Composable
-private fun PasskeyRow(passkey: Passkey, onDelete: () -> Unit) {
+private fun PasskeyRow(passkey: Passkey, onRename: () -> Unit, onDelete: () -> Unit) {
     val date = remember(passkey.lastUsedAt) { DateFormat.getDateInstance().format(Date(passkey.lastUsedAt)) }
+    val account = passkey.userName.ifBlank { passkey.displayName }
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(passkey.rpName.ifBlank { passkey.rpId }, style = MaterialTheme.typography.titleSmall)
-                Text(passkey.userName.ifBlank { passkey.displayName }, style = MaterialTheme.typography.bodyMedium)
-                Text("${passkey.rpId} - last used $date", style = MaterialTheme.typography.bodySmall)
+                Text(passkey.label.ifBlank { account }, style = MaterialTheme.typography.titleSmall)
+                if (passkey.label.isNotBlank()) Text(account, style = MaterialTheme.typography.bodyMedium)
+                Text("Last used $date", style = MaterialTheme.typography.bodySmall)
             }
+            IconButton(onClick = onRename) { Icon(Icons.Default.Edit, contentDescription = "Rename passkey") }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete passkey") }
         }
     }

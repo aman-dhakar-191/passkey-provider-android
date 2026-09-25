@@ -18,6 +18,8 @@ data class Passkey(
     val displayName: String,
     val createdAt: Long,
     val lastUsedAt: Long,
+    /** Optional name the user gave this passkey in the app; empty = none. */
+    val label: String = "",
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("credentialId", credentialId)
@@ -28,6 +30,7 @@ data class Passkey(
         .put("displayName", displayName)
         .put("createdAt", createdAt)
         .put("lastUsedAt", lastUsedAt)
+        .put("label", label)
 
     companion object {
         fun fromJson(o: JSONObject) = Passkey(
@@ -39,21 +42,27 @@ data class Passkey(
             displayName = o.optString("displayName"),
             createdAt = o.optLong("createdAt"),
             lastUsedAt = o.optLong("lastUsedAt"),
+            label = o.optString("label"),
         )
     }
 }
 
 /** Small JSON-file store in app-private storage (excluded from backups, see data_extraction_rules). */
-class PasskeyStore private constructor(private val file: File) {
+class PasskeyStore internal constructor(private val file: File) {
     private val state = MutableStateFlow(load())
     val passkeys: StateFlow<List<Passkey>> = state.asStateFlow()
 
     private fun load(): List<Passkey> {
         if (!file.exists()) return emptyList()
-        return runCatching {
+        return try {
             val array = JSONArray(file.readText())
             (0 until array.length()).map { Passkey.fromJson(array.getJSONObject(it)) }
-        }.getOrDefault(emptyList())
+        } catch (e: Exception) {
+            // Never overwrite an unreadable list with an empty one: the keys still exist in the Keystore
+            // and the file may be recoverable. Keep it aside and start empty.
+            file.renameTo(File(file.parentFile, "${file.name}.unreadable-${System.currentTimeMillis()}"))
+            emptyList()
+        }
     }
 
     private fun save(list: List<Passkey>) {
@@ -82,6 +91,11 @@ class PasskeyStore private constructor(private val file: File) {
     @Synchronized
     fun markUsed(credentialId: String, time: Long) {
         save(state.value.map { if (it.credentialId == credentialId) it.copy(lastUsedAt = time) else it })
+    }
+
+    @Synchronized
+    fun rename(credentialId: String, label: String) {
+        save(state.value.map { if (it.credentialId == credentialId) it.copy(label = label.trim().take(60)) else it })
     }
 
     @Synchronized

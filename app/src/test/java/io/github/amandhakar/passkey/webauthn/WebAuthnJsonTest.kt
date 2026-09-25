@@ -22,6 +22,14 @@ class WebAuthnJsonTest {
         assertArrayEquals(byteArrayOf(7, 8, 9), o.excludeCredentialIds.single())
     }
 
+    @Test fun rpIdsAreLowercased() {
+        val create = CreationOptions.parse(
+            """{"rp":{"id":"Login.Example.COM"},"user":{"id":"AQID","name":"a"},"challenge":"BAUG"}""",
+        )
+        assertEquals("login.example.com", create.rpId)
+        assertEquals("example.com", AssertionOptions.parse("""{"rpId":"EXAMPLE.com","challenge":"BAUG"}""").rpId)
+    }
+
     @Test fun parsesAssertionOptionsWithoutRpId() {
         val o = AssertionOptions.parse("""{"challenge":"BAUG"}""")
         assertNull(o.rpId)

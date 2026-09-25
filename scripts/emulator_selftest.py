@@ -22,7 +22,7 @@ OUT = "emulator-output"
 TIMEOUT_S = 240
 
 # Buttons to press, in priority order. Never press anything that cancels.
-PROVIDER = re.compile(r"^Passkey Provider$", re.I)
+PROVIDER = re.compile(r"^Passkey (Vault|Provider)$", re.I)
 TARGETS = [
     re.compile(r"^(Create|Create passkey|Continue|Save|Next|OK|Done|Sign in|Use passkey)$", re.I),
     re.compile(r"^(Use PIN|Use password|Use screen lock)$", re.I),

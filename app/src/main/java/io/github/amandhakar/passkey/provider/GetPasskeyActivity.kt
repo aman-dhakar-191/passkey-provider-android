@@ -2,6 +2,7 @@ package io.github.amandhakar.passkey.provider
 
 import android.content.Intent
 import android.os.Bundle
+import android.security.keystore.UserNotAuthenticatedException
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
@@ -70,11 +71,27 @@ class GetPasskeyActivity : FragmentActivity() {
             throw GetCredentialUnknownException("Passkey belongs to a different site")
         }
 
-        if (!verifyUser("Sign in with passkey", "${passkey.userName} on ${passkey.rpId}")) {
-            throw GetCredentialCancellationException("User cancelled")
+        val authenticator = Authenticator(this)
+        suspend fun sign() = withContext(Dispatchers.Default) {
+            authenticator.authenticate(passkey, options, origin, option.clientDataHash)
         }
-        val response = withContext(Dispatchers.Default) {
-            Authenticator(this@GetPasskeyActivity).authenticate(passkey, options, origin, option.clientDataHash)
+        suspend fun promptAndSign(): String {
+            if (!verifyUser("Sign in with passkey", "${passkey.userName} on ${passkey.rpId}")) {
+                throw GetCredentialCancellationException("User cancelled")
+            }
+            return sign()
+        }
+        // Android 15+ may already have verified the user in its passkey sheet. If that did not unlock the
+        // key (e.g. a weaker biometric was used), the Keystore refuses and we fall back to our own prompt.
+        val response = if (request.biometricPromptResult?.isSuccessful == true) {
+            try {
+                sign().also { ProviderErrors.note(this, "User verified in Android's passkey sheet") }
+            } catch (e: UserNotAuthenticatedException) {
+                ProviderErrors.note(this, "Sheet verification did not unlock the key; asking again")
+                promptAndSign()
+            }
+        } else {
+            promptAndSign()
         }
         ProviderErrors.note(
             this,

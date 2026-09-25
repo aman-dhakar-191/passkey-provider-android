@@ -1,4 +1,4 @@
-# passkey-provider-android
+# passkey-provider-android (Passkey Vault)
 
 An Android passkey provider (password-manager-style "credential provider") that stores passkeys on
 your phone and uses them to sign in to:
@@ -28,6 +28,14 @@ the phone is physically near the computer over Bluetooth and then opens an encry
 Android that protocol is run by Google Play services. Once connected, it asks Credential Manager,
 which offers this app's passkeys. So the app needs no extra code for QR sign-in, but it does need
 **Google Play services and Bluetooth**.
+
+**Using the app:**
+- Passkeys are grouped by site. Search appears once you have more than three passkeys, and you can
+  give a passkey a name (✏️). The name only shows on this phone, including in Android's sign-in sheet.
+- On **Android 15 and newer**, the fingerprint or screen-lock check happens inside Android's passkey
+  sheet, so choosing a passkey and verifying is one step. On Android 14, the app shows its own prompt
+  after you choose. Either way it's strong biometrics or the device PIN/pattern/password; those are
+  what unlock the keys.
 
 **Security model:**
 - The WebAuthn operation starts only after the calling app has been verified:
@@ -83,7 +91,7 @@ derived from it, so it always goes up.
 
 1. Download the APK from the latest [release](../../releases/latest) and install it.
 2. Tap **Passkey settings** in the app. It opens *Passwords, passkeys & accounts*; the name differs
-   between phone makers. There, turn the app on and pick **Passkey Provider** as the preferred
+   between phone makers. There, turn the app on and pick **Passkey Vault** as the preferred
    service.
 3. Updates: the app checks GitHub once a day and shows a notification when a new version is out.
    You can also check from the app's main screen. The first time, Android asks you to let the app
@@ -94,7 +102,7 @@ derived from it, so it always goes up.
 ## Troubleshooting
 
 **The app is not offered, or only "USB security key" / "Use another device" appear.**
-- In Android settings, Passkey Provider must be switched on and chosen as the preferred service.
+- In Android settings, Passkey Vault must be switched on and chosen as the preferred service.
 - **Chrome** must be up to date and set to use other services: *Chrome → Settings → Autofill
   services → Autofill using another service*, then close and reopen Chrome. An old or disabled
   Chrome keeps sending every passkey request to Google Password Manager. Apps that open their login

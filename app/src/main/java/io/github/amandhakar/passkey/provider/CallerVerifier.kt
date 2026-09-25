@@ -6,10 +6,8 @@ import androidx.credentials.provider.CallingAppInfo
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import io.github.amandhakar.passkey.webauthn.WebAuthnEncoding
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -45,29 +43,21 @@ class CallerVerifier(private val context: Context) {
             // have no exception at all.
             if (BuildConfig.DEBUG && rpId == SELF_TEST_RP_ID && info.packageName == context.packageName) return
             val fingerprint = WebAuthnEncoding.sha256(currentCertificate(info.signingInfo))
-            if (!DigitalAssetLinks.verify(rpId, info.packageName, fingerprint)) {
+            if (!DigitalAssetLinks.verify(rpId, info.packageName, OriginRules.fingerprint(fingerprint))) {
                 throw SecurityException("$rpId does not allow ${info.packageName} to use its passkeys")
             }
             return
         }
-        val uri = URI(origin)
-        val host = uri.host?.lowercase() ?: throw SecurityException("Invalid origin: $origin")
-        val secure = uri.scheme == "https" || (uri.scheme == "http" && host == "localhost")
-        if (!secure) throw SecurityException("Passkeys need a secure origin, got $origin")
-        if (host != rpId && !host.endsWith(".$rpId")) {
-            throw SecurityException("$origin may not use passkeys for $rpId")
-        }
+        OriginRules.browserOriginError(origin, rpId)?.let { throw SecurityException(it) }
     }
 
     companion object {
         /** Reserved RP ID for the self-test (.invalid can never be a real domain, RFC 2606). */
         const val SELF_TEST_RP_ID = "selftest.passkey-provider.invalid"
 
-        private val DOMAIN = Regex("^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
+        fun isValidDomain(value: String) = OriginRules.isValidDomain(value)
 
-        fun isValidDomain(value: String) = DOMAIN.matches(value) && (value.contains('.') || value == "localhost")
-
-        fun hostOf(origin: String): String? = runCatching { URI(origin).host?.lowercase() }.getOrNull()
+        fun hostOf(origin: String): String? = OriginRules.hostOf(origin)
 
         private fun currentCertificate(signingInfo: SigningInfo): ByteArray {
             val certs = if (signingInfo.hasMultipleSigners()) signingInfo.apkContentsSigners
@@ -100,25 +90,19 @@ internal object PrivilegedApps {
 }
 
 internal object DigitalAssetLinks {
-    private const val RELATION = "delegate_permission/common.get_login_creds"
-    private val cache = ConcurrentHashMap<String, Boolean>()
+    private const val CACHE_MS = 60 * 60 * 1000L
+    private val cache = ConcurrentHashMap<String, Pair<Boolean, Long>>()
 
-    fun verify(domain: String, packageName: String, certSha256: ByteArray): Boolean {
-        val fingerprint = certSha256.joinToString(":") { "%02X".format(it) }
+    /** Fetches https://[domain]/.well-known/assetlinks.json (no redirects) and checks it; cached for an hour. */
+    fun verify(domain: String, packageName: String, fingerprint: String): Boolean {
         val key = "$domain|$packageName|$fingerprint"
-        cache[key]?.let { return it }
-        val statements = JSONArray(Http.getText("https://$domain/.well-known/assetlinks.json"))
-        val ok = (0 until statements.length()).any { i ->
-            val s = statements.optJSONObject(i) ?: return@any false
-            val relations = s.optJSONArray("relation") ?: return@any false
-            val target = s.optJSONObject("target") ?: return@any false
-            val fingerprints = target.optJSONArray("sha256_cert_fingerprints") ?: return@any false
-            (0 until relations.length()).any { relations.optString(it) == RELATION } &&
-                target.optString("namespace") == "android_app" &&
-                target.optString("package_name") == packageName &&
-                (0 until fingerprints.length()).any { fingerprints.optString(it).equals(fingerprint, ignoreCase = true) }
-        }
-        cache[key] = ok
+        cache[key]?.let { (ok, at) -> if (System.currentTimeMillis() - at < CACHE_MS) return ok }
+        val ok = OriginRules.assetLinksAllow(
+            Http.getText("https://$domain/.well-known/assetlinks.json"),
+            packageName,
+            fingerprint,
+        )
+        cache[key] = ok to System.currentTimeMillis()
         return ok
     }
 }

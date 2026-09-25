@@ -7,6 +7,9 @@ import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.CreateCredentialUnknownException
+import androidx.credentials.exceptions.domerrors.InvalidStateError
+import androidx.credentials.exceptions.domerrors.NotSupportedError
+import androidx.credentials.exceptions.publickeycredential.CreatePublicKeyCredentialDomException
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -70,14 +73,21 @@ class CreatePasskeyActivity : FragmentActivity() {
         }
 
         if (options.algorithms.isNotEmpty() && WebAuthnEncoding.COSE_ALG_ES256 !in options.algorithms) {
-            throw CreateCredentialUnknownException("The site does not accept ES256 keys")
+            throw CreatePublicKeyCredentialDomException(NotSupportedError(), "The site does not accept ES256 keys")
         }
         val existing = PasskeyStore.get(this).forRp(rpId).map { it.credentialId }.toSet()
         if (options.excludeCredentialIds.any { Base64Url.encode(it) in existing }) {
-            throw CreateCredentialUnknownException("You already have a passkey for this account on this device")
+            // WebAuthn: InvalidStateError tells the site this account is already registered on this device.
+            throw CreatePublicKeyCredentialDomException(
+                InvalidStateError(),
+                "You already have a passkey for this account on this device",
+            )
         }
 
-        if (!verifyUser("Create a passkey", "for ${options.userName.ifBlank { rpId }} on $rpId")) {
+        // Android 15+ may already have verified the user in its passkey sheet; otherwise ask here.
+        if (request.biometricPromptResult?.isSuccessful == true) {
+            ProviderErrors.note(this, "User verified in Android's passkey sheet")
+        } else if (!verifyUser("Create a passkey", "for ${options.userName.ifBlank { rpId }} on $rpId")) {
             throw CreateCredentialCancellationException("User cancelled")
         }
         val response = withContext(Dispatchers.Default) {

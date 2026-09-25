@@ -1,9 +1,13 @@
 package io.github.amandhakar.passkey.provider
 
+import android.app.KeyguardManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.os.Build
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.CreateCredentialUnknownException
@@ -15,6 +19,7 @@ import androidx.credentials.provider.BeginCreatePublicKeyCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialResponse
 import androidx.credentials.provider.BeginGetPublicKeyCredentialOption
+import androidx.credentials.provider.BiometricPromptData
 import androidx.credentials.provider.CallingAppInfo
 import androidx.credentials.provider.CreateEntry
 import androidx.credentials.provider.CredentialEntry
@@ -61,7 +66,9 @@ class PasskeyProviderService : CredentialProviderService() {
             val entry = CreateEntry.Builder(
                 userName.ifBlank { getString(R.string.app_name) },
                 pendingIntent(CreatePasskeyActivity::class.java, null),
-            ).setDescription(getString(R.string.create_entry_description)).build()
+            ).setDescription(getString(R.string.create_entry_description))
+                .apply { sheetBiometricPrompt()?.let { setBiometricPromptData(it) } }
+                .build()
             callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
             ProviderErrors.note(this, "Create offered to the system")
         } catch (e: Throwable) {
@@ -113,12 +120,26 @@ class PasskeyProviderService : CredentialProviderService() {
                         pendingIntent(GetPasskeyActivity::class.java, passkey.credentialId),
                         option,
                     )
-                        .setDisplayName(passkey.displayName.ifBlank { null })
+                        .setDisplayName(passkey.label.ifBlank { passkey.displayName }.ifBlank { null })
+                        .apply { sheetBiometricPrompt()?.let { setBiometricPromptData(it) } }
                         .setLastUsedTime(Instant.ofEpochMilli(passkey.lastUsedAt))
                         .build()
                 }
         }
         callback.onResult(BeginGetCredentialResponse(credentialEntries = entries))
+    }
+
+    /**
+     * Android 15+ can show the fingerprint / screen-lock prompt inside its own passkey sheet, so picking a
+     * passkey and verifying is one step. Strong biometrics or the device credential only: those are what
+     * unlock the passkey keys in the Keystore. Older Android: null, and the activity shows its own prompt.
+     */
+    private fun sheetBiometricPrompt(): BiometricPromptData? {
+        if (Build.VERSION.SDK_INT < 35) return null
+        if (!getSystemService(KeyguardManager::class.java).isDeviceSecure) return null
+        return BiometricPromptData.Builder()
+            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
+            .build()
     }
 
     /** Host of a browser caller's page, or null for apps (their requests must name the rpId). */
