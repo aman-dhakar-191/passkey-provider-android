@@ -101,6 +101,9 @@ def act(nodes):
 def main():
     os.makedirs(OUT, exist_ok=True)
     print(run("install", "-r", APK))
+    # The emulator's launcher often stops responding and its dialog swallows taps; the test does not need
+    # a home screen, so switch it off.
+    print("disable launcher:", shell("pm disable-user --user 0 com.google.android.apps.nexuslauncher").strip())
     print("set PIN:", shell(f"locksettings set-pin {PIN}").strip())
     shell(f"settings put secure credential_service {SERVICE}")
     shell(f"settings put secure credential_service_primary {SERVICE}")
