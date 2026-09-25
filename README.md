@@ -58,6 +58,12 @@ Debug builds use the package `io.github.amandhakar.passkey.debug` and have self-
    base64 -w0 release.jks   # copy the output
    ```
 
+   On Windows PowerShell, which has no `base64` command, use this to copy it to the clipboard:
+
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\release.jks")) | Set-Clipboard
+   ```
+
    Under *Settings → Secrets and variables → Actions*, add these secrets:
    `KEYSTORE_BASE64` (the base64 output), `KEYSTORE_PASSWORD`, `KEY_ALIAS` (`passkey`) and `KEY_PASSWORD`.
 
@@ -76,13 +82,41 @@ derived from it, so it always goes up.
 ## Installing and updating
 
 1. Download the APK from the latest [release](../../releases/latest) and install it.
-2. Turn it on under *Settings → Passwords, passkeys & accounts* (the app's **Open settings** button
-   goes there).
+2. Tap **Passkey settings** in the app. It opens *Passwords, passkeys & accounts*; the name differs
+   between phone makers. There, turn the app on and pick **Passkey Provider** as the preferred
+   service.
 3. Updates: the app checks GitHub once a day and shows a notification when a new version is out.
    You can also check from the app's main screen. The first time, Android asks you to let the app
    install updates.
    - The download is checked against the SHA-256 that GitHub reports.
    - Android also refuses any APK that isn't signed with the same key as the installed app.
+
+## Troubleshooting
+
+**The app is not offered, or only "USB security key" / "Use another device" appear.**
+- In Android settings, Passkey Provider must be switched on and chosen as the preferred service.
+- **Chrome** must be up to date and set to use other services: *Chrome → Settings → Autofill
+  services → Autofill using another service*, then close and reopen Chrome. An old or disabled
+  Chrome keeps sending every passkey request to Google Password Manager. Apps that open their login
+  page in Chrome, such as the Salesforce app, are affected too. Edge works without extra settings.
+
+**Something fails and the browser only says "Something went wrong".** Browsers and Windows hide the
+provider's error. Open the app and look at the **Passkey activity log** card. It records each
+request, including which app asked and for which site, and why it failed. Tap **Copy details** to
+share it. If no line appears for your attempt, Android never asked the app; check the settings
+above.
+
+**The app crashes.** It shows a crash report screen with **Copy** and **Share** buttons.
+
+## Testing
+
+- **CI** (every PR): unit tests, lint, and debug and release builds.
+- **Emulator test** (every PR, `.github/workflows/emulator.yml`): boots Android 14 and 16
+  emulators and makes the app the passkey provider. It then asks Credential Manager to create a
+  passkey and sign in with it, and checks the signature. `scripts/emulator_selftest.py` taps through
+  the system sheets and PIN prompts. Screenshots, the app's log and logcat are uploaded as artifacts.
+  The self-test runs only in debug builds. It uses the reserved RP ID
+  `selftest.passkey-provider.invalid`, which only the app itself may use, and only in debug builds.
 
 ## Known limitations
 

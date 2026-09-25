@@ -2,8 +2,8 @@
 """Runs the in-app passkey self-test on an emulator and drives the system UI through it.
 
 Used by .github/workflows/emulator.yml. Installs the debug APK, sets a screen-lock PIN, makes this
-app the (preferred) credential provider, starts the self-test and then taps through Android's
-passkey sheet and the PIN prompt. Screenshots, the app's activity log and logcat are written to
+app the (preferred) credential provider, starts the self-test (create a passkey, then sign in with
+it and verify the signature) and taps through Android's passkey sheets and PIN prompts. Screenshots, the app's activity log and logcat are written to
 emulator-output/. Exits non-zero unless the app logs "Self-test passed".
 """
 import os
@@ -19,14 +19,15 @@ ACTIVITY = f"{PKG}/io.github.amandhakar.passkey.ui.MainActivity"
 APK = "app/build/outputs/apk/debug/app-debug.apk"
 PIN = "1234"
 OUT = "emulator-output"
-TIMEOUT_S = 150
+TIMEOUT_S = 240
 
 # Buttons to press, in priority order. Never press anything that cancels.
 PROVIDER = re.compile(r"^Passkey Provider$", re.I)
 TARGETS = [
-    re.compile(r"^(Create|Create passkey|Continue|Save|Next|OK|Done)$", re.I),
+    re.compile(r"^(Create|Create passkey|Continue|Save|Next|OK|Done|Sign in|Use passkey)$", re.I),
     re.compile(r"^(Use PIN|Use password|Use screen lock)$", re.I),
     PROVIDER,
+    re.compile(r"^self-test$", re.I),  # the test passkey's entry in the sign-in sheet
 ]
 AVOID = re.compile(r"cancel|close|not now|dismiss", re.I)
 
@@ -120,8 +121,7 @@ def main():
         time.sleep(3)
         step += 1
         log = activity_log()
-        if "Self-test passed" in log or "Self-test failed" in log or "Self-test cancelled" in log \
-                or "found no service" in log:
+        if "Self-test passed" in log or "Self-test failed" in log:
             break
         with open(f"{OUT}/step-{step:02d}.png", "wb") as f:
             f.write(subprocess.run(["adb", "exec-out", "screencap", "-p"], capture_output=True).stdout)
