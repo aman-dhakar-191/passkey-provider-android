@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Bundle privileged browser allowlist
+        continue-on-error: true
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fsSL https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json \
+            -o app/src/main/assets/privileged_browsers.json
+
+      - name: Unit tests, lint and debug build
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: app/build/reports/
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
