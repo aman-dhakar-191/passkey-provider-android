@@ -52,7 +52,7 @@ object SelfTest {
             "Self-test passed: created a passkey, signed in with it and verified the signature."
         } catch (e: CreateCredentialNoCreateOptionException) {
             "Self-test failed: Android found no service to save passkeys (${e.message}). " +
-                "Check that Passkey Provider is on in Passwords, passkeys & accounts."
+                "Check that Passkey Vault is on in Passwords, passkeys & accounts."
         } catch (e: CreateCredentialException) {
             "Self-test failed while creating: ${e.type}: ${e.message}"
         } catch (e: GetCredentialException) {

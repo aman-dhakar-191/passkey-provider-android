@@ -32,7 +32,8 @@ class CreationOptions(
             val params = o.optJSONArray("pubKeyCredParams")
             val algs = if (params == null) emptyList() else
                 (0 until params.length()).mapNotNull { params.optJSONObject(it)?.optInt("alg") }
-            val rpId = rp.stringOrNull("id")
+            // Domain names are case-insensitive; store and compare them in lowercase.
+            val rpId = rp.stringOrNull("id")?.lowercase()
             return CreationOptions(
                 rpId = rpId,
                 rpName = rp.stringOrNull("name") ?: rpId ?: "",
@@ -57,7 +58,7 @@ class AssertionOptions(
         fun parse(json: String): AssertionOptions {
             val o = JSONObject(json)
             return AssertionOptions(
-                rpId = o.stringOrNull("rpId"),
+                rpId = o.stringOrNull("rpId")?.lowercase(),
                 challenge = Base64Url.decode(o.getString("challenge")),
                 allowCredentialIds = o.optJSONArray("allowCredentials").credentialIds(),
             )

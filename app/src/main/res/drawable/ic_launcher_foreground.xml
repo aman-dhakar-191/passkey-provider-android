@@ -3,12 +3,9 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M29,54a11,11 0,1 1,22 0a11,11 0,1 1,-22 0"
-        android:strokeWidth="6"
-        android:strokeColor="#FFFFFF" />
+    <!-- Shield with a keyhole cut out (evenOdd), kept inside the 66dp adaptive-icon safe zone. -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M51,51h30v6h-30z M72,57h5v9h-5z M63,57h5v6h-5z" />
+        android:fillType="evenOdd"
+        android:pathData="M54,27 L77,35.5 L77,52 C77,66.5 67.5,77 54,82 C40.5,77 31,66.5 31,52 L31,35.5 Z M60.5,50 A6.5,6.5 0 1,0 47.5,50 A6.5,6.5 0 1,0 60.5,50 Z M51.5,56.5 L49.5,68 L58.5,68 L56.5,56.5 Z" />
 </vector>

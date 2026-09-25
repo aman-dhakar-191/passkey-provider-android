@@ -65,6 +65,7 @@ class MainActivity : FragmentActivity() {
                     onScanQr = ::scanQr,
                     onSelfTest = { lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) } },
                     onDelete = ::deletePasskey,
+                    onRename = { passkey, name -> store.rename(passkey.credentialId, name) },
                     onCheckUpdate = { checkForUpdate(quiet = false) },
                     onInstallUpdate = ::installUpdate,
                     onCopyProblems = ::copyProblems,

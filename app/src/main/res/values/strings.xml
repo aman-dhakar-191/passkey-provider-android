@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Passkey Provider</string>
+    <string name="app_name">Passkey Vault</string>
     <string name="create_entry_description">Save a passkey on this device, protected by your screen lock</string>
 </resources>
