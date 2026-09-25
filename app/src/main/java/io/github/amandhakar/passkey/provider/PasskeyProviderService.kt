@@ -8,6 +8,7 @@ import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.CreateCredentialUnknownException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.BeginCreateCredentialRequest
 import androidx.credentials.provider.BeginCreateCredentialResponse
 import androidx.credentials.provider.BeginCreatePublicKeyCredentialRequest
@@ -37,28 +38,52 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class PasskeyProviderService : CredentialProviderService() {
 
+    override fun onCreate() {
+        super.onCreate()
+        ProviderErrors.note(this, "Passkey service started by Android")
+    }
+
     override fun onBeginCreateCredentialRequest(
         request: BeginCreateCredentialRequest,
         cancellationSignal: CancellationSignal,
         callback: OutcomeReceiver<BeginCreateCredentialResponse, CreateCredentialException>,
     ) {
-        if (request !is BeginCreatePublicKeyCredentialRequest) {
-            callback.onError(CreateCredentialUnknownException("Only passkeys are supported"))
-            return
+        ProviderErrors.note(this, "Create asked by ${request.callingAppInfo?.packageName ?: "unknown caller"}")
+        // An exception here is not a crash: Android drops it silently and just leaves this provider out.
+        try {
+            if (request !is BeginCreatePublicKeyCredentialRequest) {
+                callback.onError(CreateCredentialUnknownException("Only passkeys are supported"))
+                return
+            }
+            val userName = runCatching { JSONObject(request.requestJson).getJSONObject("user").optString("name") }
+                .getOrNull().orEmpty()
+            val entry = CreateEntry.Builder(
+                userName.ifBlank { getString(R.string.app_name) },
+                pendingIntent(CreatePasskeyActivity::class.java, null),
+            ).setDescription(getString(R.string.create_entry_description)).build()
+            callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
+            ProviderErrors.note(this, "Create offered to the system")
+        } catch (e: Throwable) {
+            ProviderErrors.note(this, "Create offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
+            callback.onError(CreateCredentialUnknownException(e.message ?: e.javaClass.simpleName))
         }
-        val userName = runCatching { JSONObject(request.requestJson).getJSONObject("user").optString("name") }
-            .getOrNull().orEmpty()
-        val entry = CreateEntry.Builder(
-            userName.ifBlank { getString(R.string.app_name) },
-            pendingIntent(CreatePasskeyActivity::class.java, null),
-        ).setDescription(getString(R.string.create_entry_description)).build()
-        ProviderErrors.note(this, "Create offered to ${request.callingAppInfo?.packageName ?: "unknown caller"}")
-        callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
     }
 
     override fun onBeginGetCredentialRequest(
         request: BeginGetCredentialRequest,
         cancellationSignal: CancellationSignal,
+        callback: OutcomeReceiver<BeginGetCredentialResponse, GetCredentialException>,
+    ) {
+        try {
+            beginGet(request, callback)
+        } catch (e: Throwable) {
+            ProviderErrors.note(this, "Sign-in offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
+            callback.onError(GetCredentialUnknownException(e.message ?: e.javaClass.simpleName))
+        }
+    }
+
+    private fun beginGet(
+        request: BeginGetCredentialRequest,
         callback: OutcomeReceiver<BeginGetCredentialResponse, GetCredentialException>,
     ) {
         val store = PasskeyStore.get(this)
