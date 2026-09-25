@@ -96,13 +96,12 @@ def act(nodes):
     # Google's "create on another device" (QR code) path cannot finish on an emulator; only follow it
     # if this provider is not offered at all, which the log then shows.
     on_hybrid_screen = any("another device" in label(n).lower() for n in nodes)
-    # Our own home screen shows the app name too (title bar); tapping it while the system sheet is opening
-    # cancels the sheet. Only press the provider name inside the system sheet.
-    on_our_home_screen = any(label(n) == "Scan QR code" for n in nodes)
+    # On our own home screen, wait: its texts (app name, passkey names) match the patterns below, and any tap
+    # there while Android's sheet is opening cancels the sheet.
+    if any(label(n) == "Scan QR code" for n in nodes):
+        return None
     for pattern in TARGETS:
         if on_hybrid_screen and pattern is not PROVIDER:
-            continue
-        if on_our_home_screen and pattern is PROVIDER:
             continue
         for node in nodes:
             text = label(node)
