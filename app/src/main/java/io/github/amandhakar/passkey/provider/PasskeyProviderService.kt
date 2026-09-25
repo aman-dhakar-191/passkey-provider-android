@@ -28,6 +28,7 @@ import androidx.credentials.provider.CredentialEntry
 import androidx.credentials.provider.CredentialProviderService
 import androidx.credentials.provider.ProviderClearCredentialStateRequest
 import androidx.credentials.provider.PublicKeyCredentialEntry
+import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.R
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.webauthn.AssertionOptions
@@ -76,7 +77,7 @@ class PasskeyProviderService : CredentialProviderService() {
             callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
             ProviderErrors.note(this, "Create offered to the system")
         } catch (e: Throwable) {
-            ProviderErrors.note(this, "Create offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
+            ProviderErrors.problem(this, "Create offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
             callback.onError(CreateCredentialUnknownException(e.message ?: e.javaClass.simpleName))
         }
     }
@@ -89,7 +90,7 @@ class PasskeyProviderService : CredentialProviderService() {
         try {
             beginGet(request, callback)
         } catch (e: Throwable) {
-            ProviderErrors.note(this, "Sign-in offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
+            ProviderErrors.problem(this, "Sign-in offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
             callback.onError(GetCredentialUnknownException(e.message ?: e.javaClass.simpleName))
         }
     }
@@ -108,13 +109,17 @@ class PasskeyProviderService : CredentialProviderService() {
             val allowed = options.allowCredentialIds.map { Base64Url.encode(it) }.toSet()
             val matching = if (rpId == null) emptyList() else store.forRp(rpId)
                 .filter { allowed.isEmpty() || it.credentialId in allowed }
-            ProviderErrors.note(
-                this,
-                "Sign-in asked by ${request.callingAppInfo?.packageName ?: "unknown caller"} for " +
-                    "${rpId ?: "unknown site"}${if (options.rpId == null) " (site taken from the page)" else ""}: " +
-                    "${matching.size} passkey(s) offered, ${allowed.size} allowed by the site, " +
-                    "passkeys saved for: ${store.all().map { it.rpId }.distinct().ifEmpty { listOf("none") }}",
-            )
+            // Store builds record only how many passkeys are saved, never the list of the user's sites.
+            val saved = if (BuildConfig.LOG_ALL_REQUESTS) {
+                "passkeys saved for: ${store.all().map { it.rpId }.distinct().ifEmpty { listOf("none") }}"
+            } else {
+                "${store.all().size} passkey(s) saved in total"
+            }
+            val message = "Sign-in asked by ${request.callingAppInfo?.packageName ?: "unknown caller"} for " +
+                "${rpId ?: "unknown site"}${if (options.rpId == null) " (site taken from the page)" else ""}: " +
+                "${matching.size} passkey(s) offered, ${allowed.size} allowed by the site, $saved"
+            // Nothing to offer looks like a failure to the user, so it is kept even in store builds.
+            if (matching.isEmpty()) ProviderErrors.problem(this, message) else ProviderErrors.note(this, message)
             matching
                 .sortedByDescending { it.lastUsedAt }
                 .forEach { passkey ->

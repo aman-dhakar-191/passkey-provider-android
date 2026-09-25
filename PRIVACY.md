@@ -20,8 +20,13 @@ Keystore. We can't see, access or copy any of it.
   (StrongBox) where the phone has it. It can't be exported from the phone by the app, by you or by us.
 - **Passkey details.** For each passkey: the website or app it belongs to, the account ID, account name
   and display name the website provided, when it was created and last used, and a name you give it.
-- **Activity log.** Recent passkey requests (which app asked, for which website, the result, and any
-  error), kept so you can troubleshoot. It holds at most the last 30 entries. You can copy or clear it.
+- **Activity log**, kept so you can troubleshoot and, if you choose, copy the details to us when asking
+  for help. It holds at most the last 30 entries, and you can clear it at any time.
+  - **App-store versions** record only requests that went wrong: which app asked, for which website,
+    what happened and the error. Successful sign-ins aren't recorded, and the log never lists the
+    websites you have passkeys for (only how many passkeys you have).
+  - **GitHub version** records every passkey request (which app asked, for which website, and the
+    result) and the websites you have passkeys for, to help diagnose problems.
 - **Crash reports.** If the app crashes, the error details are shown to you on the phone. They are
   never sent anywhere.
 

@@ -136,9 +136,10 @@ date updates itself.
   page in Chrome, such as the Salesforce app, are affected too. Edge works without extra settings.
 
 **Something fails and the browser only says "Something went wrong".** Browsers and Windows hide the
-provider's error. Open the app and look at the **Passkey activity log** card. It records each
-request, including which app asked and for which site, and why it failed. Tap **Copy details** to
-share it. If no line appears for your attempt, Android never asked the app; check the settings
+provider's error. Open the app's **⋮ → Activity log**. It shows which app asked, for which site, and
+why the request failed. Tap **Copy** to share it. The GitHub version records every request; store
+versions record only requests that went wrong (with the steps leading to it) and never the list of
+your sites. If nothing appears for a failed attempt, Android never asked the app; check the settings
 above.
 
 **The app crashes.** It shows a crash report screen with **Copy** and **Share** buttons.

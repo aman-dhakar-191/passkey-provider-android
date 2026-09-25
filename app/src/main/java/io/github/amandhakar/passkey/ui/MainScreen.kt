@@ -197,7 +197,12 @@ fun MainScreen(
             title = { Text("Activity log") },
             text = {
                 Text(
-                    log ?: "Nothing yet. Passkey requests from apps and browsers are recorded here.",
+                    log ?: if (BuildConfig.LOG_ALL_REQUESTS) {
+                        "Nothing yet. Passkey requests from apps and browsers are recorded here."
+                    } else {
+                        "Nothing yet. If a passkey request goes wrong, the details are kept here so you can copy " +
+                            "them for support. Successful sign-ins aren't recorded."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),

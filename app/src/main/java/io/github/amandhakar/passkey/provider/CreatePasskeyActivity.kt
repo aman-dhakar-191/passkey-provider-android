@@ -93,7 +93,7 @@ class CreatePasskeyActivity : FragmentActivity() {
         val response = withContext(Dispatchers.Default) {
             Authenticator(this@CreatePasskeyActivity).register(options, rpId, origin)
         }
-        ProviderErrors.note(this, "Passkey created for $rpId (origin $origin), returned ${response.length} bytes")
+        ProviderErrors.succeeded(this, "Passkey created for $rpId (origin $origin), returned ${response.length} bytes")
         return response
     }
 

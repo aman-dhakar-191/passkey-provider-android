@@ -93,7 +93,7 @@ class GetPasskeyActivity : FragmentActivity() {
         } else {
             promptAndSign()
         }
-        ProviderErrors.note(
+        ProviderErrors.succeeded(
             this,
             "Signed in to ${passkey.rpId} for ${request.callingAppInfo.packageName} (origin $origin)",
         )
