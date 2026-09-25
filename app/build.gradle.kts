@@ -44,9 +44,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // R8 stripped constructors that WorkManager and ML Kit create by reflection at startup, and
+            // v1.0.1 crashed on launch. The app is sideloaded, so a few MB saved is not worth that risk.
+            isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
             buildConfigField("boolean", "UPDATES_ENABLED", "true")
         }
