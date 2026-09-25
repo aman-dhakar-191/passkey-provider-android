@@ -1,15 +1,21 @@
 name: Release
 
-# Push a tag like v1.2.3 (or run manually with a version) to build a signed APK and publish a
-# GitHub release. Installed apps check the latest release and update themselves.
+# Run manually and pick patch / minor / major: the next version is worked out from the latest
+# vX.Y.Z tag. Pushing a tag like v1.2.3 also works. Installed apps check the latest release and
+# update themselves.
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
     inputs:
+      bump:
+        description: "Version increase (patch = fixes, minor = new features, major = big changes)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
       version:
-        description: "Version to release, e.g. 1.2.3"
-        required: true
+        description: "Exact version instead (optional, e.g. 2.0.0)"
+        required: false
 
 permissions:
   contents: write
@@ -24,12 +30,31 @@ jobs:
       - name: Resolve version
         id: version
         env:
+          BUMP: ${{ inputs.bump }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then V="$INPUT_VERSION"; else V="$GITHUB_REF_NAME"; fi
-          V="${V#v}"
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          elif [ -n "$INPUT_VERSION" ]; then
+            V="${INPUT_VERSION#v}"
+          else
+            LATEST=$(git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/v##' \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+            IFS=. read -r MAJOR MINOR PATCH <<< "${LATEST:-0.0.0}"
+            case "$BUMP" in
+              major) V="$((MAJOR + 1)).0.0" ;;
+              minor) V="$MAJOR.$((MINOR + 1)).0" ;;
+              *) V="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+            esac
+            echo "Latest release ${LATEST:-none}, $BUMP bump -> $V"
+          fi
           if ! [[ "$V" =~ ^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
             echo "::error::Version must look like 1.2.3 (each part 0-99), got '$V'"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] \
+            && git ls-remote --exit-code --tags origin "refs/tags/v$V" > /dev/null; then
+            echo "::error::v$V is already released"
             exit 1
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
