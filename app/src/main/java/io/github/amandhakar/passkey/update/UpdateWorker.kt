@@ -1,6 +1,7 @@
 package io.github.amandhakar.passkey.update
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -25,6 +26,9 @@ import java.util.concurrent.TimeUnit
 /** Daily background check that posts a notification when a newer release exists. */
 class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
+    // Lint flags notify() in the store build, which does not declare POST_NOTIFICATIONS. That build never
+    // schedules this worker (SELF_UPDATE=false), and the permission is checked at runtime below anyway.
+    @SuppressLint("NotificationPermission")
     override suspend fun doWork(): Result {
         val release = withContext(Dispatchers.IO) { runCatching { UpdateManager.latestRelease() }.getOrNull() }
             ?: return Result.success()
