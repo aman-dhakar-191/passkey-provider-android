@@ -6,17 +6,27 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -35,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.data.Passkey
@@ -44,6 +55,11 @@ import kotlinx.coroutines.flow.StateFlow
 import java.text.DateFormat
 import java.util.Date
 
+/**
+ * Passkeys first. The provider status is one line (a card only when it needs action); the activity log,
+ * settings shortcut and version/updates live in the top-bar menu; banners appear only when something
+ * needs attention (last request failed, update available).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -64,30 +80,72 @@ fun MainScreen(
     onClearProblems: () -> Unit,
 ) {
     val passkeys by passkeysFlow.collectAsState()
-    val problems by problemsFlow.collectAsState()
+    val log by problemsFlow.collectAsState()
     var pendingDelete by remember { mutableStateOf<Passkey?>(null) }
     var pendingRename by remember { mutableStateOf<Passkey?>(null) }
     var query by remember { mutableStateOf("") }
+    var menuOpen by remember { mutableStateOf(false) }
+    var showLog by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     val groups = remember(passkeys, query) { PasskeyGroups.of(passkeys, query) }
+    val lastEntry = log?.substringBefore("\n----------")
+    val lastFailed = lastEntry?.contains("FAILED") == true
+    val updateNeedsAttention = updateState is UpdateState.Available || updateState is UpdateState.Downloading ||
+        updateState is UpdateState.Installing
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Passkey Vault") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Passkey Vault") },
+                actions = {
+                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Menu") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Passkey settings") },
+                            onClick = { menuOpen = false; onOpenProviderSettings() },
+                        )
+                        DropdownMenuItem(text = { Text("Activity log") }, onClick = { menuOpen = false; showLog = true })
+                        DropdownMenuItem(
+                            text = { Text(if (updatesEnabled) "About & updates" else "About") },
+                            onClick = { menuOpen = false; showAbout = true },
+                        )
+                        if (BuildConfig.DEBUG) {
+                            DropdownMenuItem(text = { Text("Test passkey") }, onClick = { menuOpen = false; onSelfTest() })
+                        }
+                    }
+                },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(onClick = onScanQr) { Text("Scan QR code") }
+        },
+    ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = padding.calculateTopPadding() + 8.dp,
-                bottom = padding.calculateBottomPadding() + 16.dp,
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 88.dp, // room for the floating button
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { ProviderCard(providerEnabled, onOpenProviderSettings, onSelfTest) }
-            problems?.let { text -> item { ProblemsCard(text, onCopyProblems, onClearProblems) } }
-            item { CrossDeviceCard(onScanQr) }
-            if (updatesEnabled) item { UpdateCard(updateState, versionName, onCheckUpdate, onInstallUpdate) }
+            item { ProviderStatus(providerEnabled, onOpenProviderSettings) }
+            if (lastFailed) {
+                item {
+                    Banner(
+                        text = "The last passkey request failed.",
+                        action = "View log",
+                        onAction = { showLog = true },
+                    )
+                }
+            }
+            if (updatesEnabled && updateNeedsAttention) {
+                item { UpdatePanel(updateState, versionName, onCheckUpdate, onInstallUpdate) }
+            }
             item {
                 Text(
-                    "Saved passkeys (${passkeys.size})",
+                    "Passkeys (${passkeys.size})",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 8.dp),
                 )
@@ -95,7 +153,8 @@ fun MainScreen(
             if (passkeys.isEmpty()) {
                 item {
                     Text(
-                        "No passkeys yet. When a website or app offers to create a passkey, choose this app.",
+                        "No passkeys yet. When a website or app offers to create a passkey, choose Passkey Vault. " +
+                            "To sign in on a computer, choose \"Use a phone or tablet\" there and scan the QR code.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -114,9 +173,15 @@ fun MainScreen(
             }
             groups.forEach { group ->
                 item(key = "site:${group.rpId}") {
-                    Column(Modifier.padding(top = 4.dp)) {
+                    Column(Modifier.padding(top = 6.dp)) {
                         Text(group.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                        if (group.title != group.rpId) Text(group.rpId, style = MaterialTheme.typography.bodySmall)
+                        if (group.title != group.rpId) {
+                            Text(
+                                group.rpId,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 items(group.passkeys, key = { it.credentialId }) { passkey ->
@@ -124,6 +189,48 @@ fun MainScreen(
                 }
             }
         }
+    }
+
+    if (showLog) {
+        AlertDialog(
+            onDismissRequest = { showLog = false },
+            title = { Text("Activity log") },
+            text = {
+                Text(
+                    log ?: "Nothing yet. Passkey requests from apps and browsers are recorded here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                if (log != null) TextButton(onClick = onCopyProblems) { Text("Copy") }
+            },
+            dismissButton = {
+                Row {
+                    if (log != null) TextButton(onClick = { onClearProblems(); showLog = false }) { Text("Clear") }
+                    TextButton(onClick = { showLog = false }) { Text("Close") }
+                }
+            },
+        )
+    }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            title = { Text("Passkey Vault $versionName") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Passkeys are created in this phone's secure hardware and never leave it. " +
+                            "They are not backed up, so keep another way to sign in to important accounts.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (updatesEnabled) UpdatePanel(updateState, versionName, onCheckUpdate, onInstallUpdate, inDialog = true)
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
+        )
     }
 
     pendingRename?.let { passkey ->
@@ -171,82 +278,85 @@ fun MainScreen(
     }
 }
 
+/** One quiet line when all is well; a card with the fix when the provider is off. */
 @Composable
-private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit, onSelfTest: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun ProviderStatus(enabled: Boolean, onOpenSettings: () -> Unit) {
+    if (enabled) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text(
+                "Passkey Vault is active for apps and browsers",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        return
+    }
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                if (enabled) "Passkey provider is on" else "Passkey provider is off",
+                "Passkey Vault is turned off",
                 style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
             )
             Text(
-                if (enabled) "Apps and browsers on this phone can create and use passkeys stored here."
-                else "Turn this app on under Passwords, passkeys & accounts so apps and browsers can use it.",
+                "Turn it on and choose it as the preferred service under Passwords, passkeys & accounts, " +
+                    "so apps and browsers can use it.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
             )
-            // Always shown: this is where the user picks the preferred passkey service, and that page is
-            // hard to find in Settings (its name and place differ between phone makers).
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpenSettings) { Text("Passkey settings") }
-                if (BuildConfig.DEBUG) OutlinedButton(onClick = onSelfTest) { Text("Test passkey") }
-            }
+            Button(onClick = onOpenSettings) { Text("Open settings") }
         }
     }
 }
 
 @Composable
-private fun ProblemsCard(text: String, onCopy: () -> Unit, onClear: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Passkey activity log", style = MaterialTheme.typography.titleMedium)
+private fun Banner(text: String, action: String, onAction: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
             Text(
-                text.lineSequence().take(4).joinToString("\n"),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onCopy) { Text("Copy details") }
-                OutlinedButton(onClick = onClear) { Text("Clear") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CrossDeviceCard(onScanQr: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Sign in on a computer", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "On the computer choose \"Use a phone or tablet\", then scan the QR code. " +
-                    "Keep Bluetooth on - the phone must be near the computer.",
+                text,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
             )
-            Button(onClick = onScanQr) { Text("Scan QR code") }
+            TextButton(onClick = onAction) { Text(action) }
         }
     }
 }
 
 @Composable
-private fun UpdateCard(
+private fun UpdatePanel(
     state: UpdateState,
     versionName: String,
     onCheck: () -> Unit,
     onInstall: (Release) -> Unit,
+    inDialog: Boolean = false,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("App version $versionName", style = MaterialTheme.typography.titleMedium)
+    val content = @Composable {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when (state) {
                 UpdateState.Idle -> OutlinedButton(onClick = onCheck) { Text("Check for updates") }
-                UpdateState.Checking -> Text("Checking...")
+                UpdateState.Checking -> Text("Checking for updates...")
                 UpdateState.UpToDate -> {
-                    Text("You have the latest version.")
+                    Text("You have the latest version ($versionName).")
                     OutlinedButton(onClick = onCheck) { Text("Check again") }
                 }
                 is UpdateState.Available -> {
-                    Text("Version ${state.release.version} is available.")
+                    Text("Version ${state.release.version} is available.", style = MaterialTheme.typography.titleSmall)
                     if (state.release.notes.isNotBlank()) {
-                        Text(state.release.notes.take(500), style = MaterialTheme.typography.bodySmall)
+                        Text(state.release.notes.take(300), style = MaterialTheme.typography.bodySmall)
                     }
                     Button(onClick = { onInstall(state.release) }) { Text("Download and install") }
                 }
@@ -262,6 +372,11 @@ private fun UpdateCard(
             }
         }
     }
+    if (inDialog) {
+        content()
+    } else {
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { content() } }
+    }
 }
 
 @Composable
@@ -269,11 +384,15 @@ private fun PasskeyRow(passkey: Passkey, onRename: () -> Unit, onDelete: () -> U
     val date = remember(passkey.lastUsedAt) { DateFormat.getDateInstance().format(Date(passkey.lastUsedAt)) }
     val account = passkey.userName.ifBlank { passkey.displayName }
     Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(passkey.label.ifBlank { account }, style = MaterialTheme.typography.titleSmall)
                 if (passkey.label.isNotBlank()) Text(account, style = MaterialTheme.typography.bodyMedium)
-                Text("Last used $date", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "Last used $date",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             IconButton(onClick = onRename) { Icon(Icons.Default.Edit, contentDescription = "Rename passkey") }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete passkey") }
