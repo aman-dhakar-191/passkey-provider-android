@@ -2,6 +2,8 @@ package io.github.amandhakar.passkey.ui
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
@@ -22,6 +24,7 @@ import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.provider.PasskeyProviderService
+import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.provider.verifyUser
 import io.github.amandhakar.passkey.update.Release
 import io.github.amandhakar.passkey.update.UpdateManager
@@ -49,6 +52,7 @@ class MainActivity : FragmentActivity() {
             PasskeyTheme {
                 MainScreen(
                     passkeysFlow = store.passkeys,
+                    problemsFlow = ProviderErrors.latest,
                     providerEnabled = providerEnabled.value,
                     updateState = updateState.value,
                     updatesEnabled = BuildConfig.UPDATES_ENABLED,
@@ -58,6 +62,8 @@ class MainActivity : FragmentActivity() {
                     onDelete = ::deletePasskey,
                     onCheckUpdate = { checkForUpdate(quiet = false) },
                     onInstallUpdate = ::installUpdate,
+                    onCopyProblems = ::copyProblems,
+                    onClearProblems = { ProviderErrors.clear(this) },
                 )
             }
         }
@@ -66,6 +72,13 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         providerEnabled.value = isProviderEnabled()
+        ProviderErrors.load(this)
+    }
+
+    private fun copyProblems() {
+        val text = ProviderErrors.latest.value ?: return
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Passkey problems", text))
+        toast("Copied")
     }
 
     private fun isProviderEnabled(): Boolean = runCatching {

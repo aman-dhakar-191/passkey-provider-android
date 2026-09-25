@@ -31,8 +31,10 @@ class GetPasskeyActivity : FragmentActivity() {
                     GetCredentialResponse(PublicKeyCredential(signIn())),
                 )
             } catch (e: GetCredentialException) {
+                if (e !is GetCredentialCancellationException) ProviderErrors.record(this@GetPasskeyActivity, "Passkey sign-in", e)
                 PendingIntentHandler.setGetCredentialException(result, e)
             } catch (e: Exception) {
+                ProviderErrors.record(this@GetPasskeyActivity, "Passkey sign-in", e)
                 PendingIntentHandler.setGetCredentialException(
                     result,
                     GetCredentialUnknownException(e.message ?: e.javaClass.simpleName),
