@@ -22,10 +22,11 @@ OUT = "emulator-output"
 TIMEOUT_S = 150
 
 # Buttons to press, in priority order. Never press anything that cancels.
+PROVIDER = re.compile(r"^Passkey Provider$", re.I)
 TARGETS = [
-    re.compile(r"^Passkey Provider", re.I),
     re.compile(r"^(Create|Create passkey|Continue|Save|Next|OK|Done)$", re.I),
     re.compile(r"^(Use PIN|Use password|Use screen lock)$", re.I),
+    PROVIDER,
 ]
 AVOID = re.compile(r"cancel|close|not now|dismiss", re.I)
 
@@ -85,7 +86,7 @@ def act(nodes):
     # if this provider is not offered at all, which the log then shows.
     on_hybrid_screen = any("another device" in label(n).lower() for n in nodes)
     for pattern in TARGETS:
-        if on_hybrid_screen and pattern is not TARGETS[0]:
+        if on_hybrid_screen and pattern is not PROVIDER:
             continue
         for node in nodes:
             text = label(node)
