@@ -2,7 +2,9 @@ name: Emulator passkey test
 
 # Runs the in-app passkey self-test on stock Android emulators: installs the debug app, makes it the
 # credential provider, creates a passkey through Credential Manager and taps through the system UI.
-# Screenshots, the app's activity log and logcat are uploaded as the "emulator-api-N" artifact.
+# Runs on the plain debug build and on "minified" (a debug build with release's R8 settings), so code R8
+# wrongly removes fails here rather than on users' phones.
+# Screenshots, the app's activity log and logcat are uploaded as the "emulator-api-N-<build>" artifact.
 on:
   pull_request:
   workflow_dispatch:
@@ -10,6 +12,9 @@ on:
 concurrency:
   group: emulator-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   selftest:
@@ -19,18 +24,23 @@ jobs:
       fail-fast: false
       matrix:
         api-level: [34, 36]
+        build: [debug, minified]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
-      - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+      - name: Build ${{ matrix.build }} APK
+        env:
+          BUILD: ${{ matrix.build }}
+        run: ./gradlew --no-daemon "assembleGithub${BUILD^}"
 
       - name: Enable KVM
         run: |
@@ -40,7 +50,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run self-test on emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api-level }}
           target: google_apis
@@ -48,11 +58,11 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: python3 scripts/emulator_selftest.py
+          script: BUILD_TYPE=${{ matrix.build }} python3 scripts/emulator_selftest.py
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: emulator-api-${{ matrix.api-level }}
+          name: emulator-api-${{ matrix.api-level }}-${{ matrix.build }}
           path: emulator-output/
           if-no-files-found: ignore

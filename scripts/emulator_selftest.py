@@ -16,7 +16,9 @@ import xml.etree.ElementTree as ET
 PKG = "io.github.amandhakar.passkey.debug"
 SERVICE = f"{PKG}/io.github.amandhakar.passkey.provider.PasskeyProviderService"
 ACTIVITY = f"{PKG}/io.github.amandhakar.passkey.ui.MainActivity"
-APK = "app/build/outputs/apk/debug/app-debug.apk"
+# BUILD_TYPE=minified tests the build with release's R8 settings.
+BUILD_TYPE = os.environ.get("BUILD_TYPE", "debug")
+APK = f"app/build/outputs/apk/github/{BUILD_TYPE}/app-github-{BUILD_TYPE}.apk"
 PIN = "1234"
 OUT = "emulator-output"
 TIMEOUT_S = 240
@@ -30,6 +32,7 @@ TARGETS = [
     re.compile(r"^self-test$", re.I),  # the test passkey's entry in the sign-in sheet
 ]
 AVOID = re.compile(r"cancel|close|not now|dismiss", re.I)
+last_pin = 0.0
 
 
 def run(*args):
@@ -42,7 +45,10 @@ def shell(cmd):
 
 
 def activity_log():
-    return shell(f"run-as {PKG} cat files/provider_errors.txt")
+    if BUILD_TYPE == "debug":
+        return shell(f"run-as {PKG} cat files/provider_errors.txt")
+    # Not debuggable, so run-as can't read the app's files; SELF_TEST builds copy the log to logcat.
+    return run("logcat", "-d", "-s", "PasskeyVault:I")
 
 
 def ui_nodes():
@@ -88,10 +94,16 @@ def act(nodes):
         return "unlocked the screen"
     for node in nodes:
         if node.get("class", "").endswith("EditText") and node.get("password") == "true":
+            # The prompt takes a moment to close after the PIN; typing it again then lands on the next sheet
+            # and cancels it. So wait before treating a PIN field as a new prompt.
+            global last_pin
+            if time.time() - last_pin < 8:
+                return None
             x, y = center(node)
             shell(f"input tap {x} {y}")
             shell(f"input text {PIN}")
             shell("input keyevent 66")
+            last_pin = time.time()
             return "entered PIN"
     # Google's "create on another device" (QR code) path cannot finish on an emulator; only follow it
     # if this provider is not offered at all, which the log then shows.
@@ -115,6 +127,8 @@ def act(nodes):
 def main():
     os.makedirs(OUT, exist_ok=True)
     print(run("install", "-r", APK))
+    # The minified build has the self-updater on, which asks for this at launch; the dialog would cover the sheet.
+    shell(f"pm grant {PKG} android.permission.POST_NOTIFICATIONS")
     print("set PIN:", shell(f"locksettings set-pin {PIN}").strip())
     shell(f"settings put secure credential_service {SERVICE}")
     shell(f"settings put secure credential_service_primary {SERVICE}")
@@ -151,11 +165,12 @@ def main():
     with open(f"{OUT}/activity-log.txt", "w") as f:
         f.write(log)
 
-    print("\n===== App activity log (newest first) =====\n" + log)
     print("===== Credential-related logcat =====")
     for line in run("logcat", "-d").splitlines():
         if re.search(r"credential|passkey|CredentialManager|amandhakar", line, re.I):
             print(line)
+    # Last, so it is at the end of the job log.
+    print(f"\n===== App activity log, {BUILD_TYPE} build =====\n" + log)
     sys.exit(0 if "Self-test passed" in log else 1)
 
 

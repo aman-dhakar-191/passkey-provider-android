@@ -25,10 +25,12 @@ android {
         applicationId = "io.github.amandhakar.passkey"
         // Third-party credential providers need the Credential Manager framework from Android 14.
         minSdk = 34
-        targetSdk = 35
+        // Play requires targeting a recent Android release; 36 = Android 16.
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
-        buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+        // The in-app passkey self-test and its reserved RP ID; never in release builds.
+        buildConfigField("boolean", "SELF_TEST", "false")
     }
 
     signingConfigs {
@@ -44,17 +46,46 @@ android {
 
     buildTypes {
         release {
-            // R8 stripped constructors that WorkManager and ML Kit create by reflection at startup, and
-            // v1.0.1 crashed on launch. The app is sideloaded, so a few MB saved is not worth that risk.
-            isMinifyEnabled = false
+            // R8 shrinks unused code and resources. v1.0.1 crashed on launch because R8 removed
+            // constructors that WorkManager and ML Kit create by reflection, and nothing had run a minified
+            // build. The keep rules in proguard-rules.pro fix that, and the "minified" build type below runs
+            // the emulator self-test on a build with these same R8 settings.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
-            buildConfigField("boolean", "UPDATES_ENABLED", "true")
         }
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            // Debug builds have a different package name, so self-updating from releases makes no sense.
-            buildConfigField("boolean", "UPDATES_ENABLED", "false")
+            buildConfigField("boolean", "SELF_TEST", "true")
+        }
+        // Release's R8 settings with the debug package, debug key and the self-test. Not debuggable, since
+        // R8 skips its optimizations for debuggable builds and this must behave like release.
+        // Only CI uses it (.github/workflows/emulator.yml).
+        create("minified") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            matchingFallbacks += "debug"
+        }
+    }
+
+    // Two release channels from the same code (src/main is shared):
+    //  - github: sideloaded from GitHub Releases. src/github adds the self-updater, its permissions
+    //            (REQUEST_INSTALL_PACKAGES, POST_NOTIFICATIONS) and WorkManager.
+    //  - store:  Google Play / Indus Appstore, which deliver updates. src/store only has a stub, so the
+    //            store app contains no update code at all (checked by scripts/check-store-build.sh).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+        }
+        create("store") {
+            dimension = "distribution"
         }
     }
 
@@ -90,7 +121,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.biometric)
-    implementation(libs.androidx.work.runtime.ktx)
+    "githubImplementation"(libs.androidx.work.runtime.ktx) // only the self-updater uses WorkManager
     implementation(libs.play.services.code.scanner)
     implementation(libs.kotlinx.coroutines.android)
 

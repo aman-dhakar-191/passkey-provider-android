@@ -1,0 +1,118 @@
+name: Store release
+
+# Builds the "store" channel (Google Play, Indus Appstore) from an existing GitHub release tag, so the
+# store version is always the same code as a released, tested GitHub version:
+#   - passkey-vault-<version>.aab  for Google Play (and Indus if it takes bundles)
+#   - passkey-vault-<version>.apk  for Indus Appstore / other stores that take APKs
+# Both are signed with the same key as the GitHub releases (the KEYSTORE_* secrets). The files are kept
+# as a download for 30 days; upload them in the store's developer console. See README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Released version to build, e.g. 1.2.0 (empty = latest release)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            V="${INPUT_VERSION#v}"
+          else
+            V=$(git ls-remote --tags --refs "$REPO_URL" 'v*' | sed 's#.*refs/tags/v##' \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          if ! [[ "$V" =~ ^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
+            echo "::error::Version must look like 1.2.3, got '$V'"; exit 1
+          fi
+          if ! git ls-remote --exit-code --tags "$REPO_URL" "refs/tags/v$V" > /dev/null; then
+            echo "::error::v$V has not been released. Run the Release workflow first, then build that version for the stores."
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: v${{ steps.version.outputs.version }}
+
+      - name: Check this version has a store build
+        run: |
+          if ! grep -q 'create("store")' app/build.gradle.kts; then
+            echo "::error::v${{ steps.version.outputs.version }} is older than the store channel; release a newer version first."
+            exit 1
+          fi
+
+      - name: Decode signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is missing. See 'Releasing' in README.md."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-disabled: true # signed builds never use a cache an earlier run could have poisoned
+
+      - name: Bundle privileged browser allowlist
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fsSL https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json \
+            -o app/src/main/assets/privileged_browsers.json
+
+      - name: Test and build store bundle + APK
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew --no-daemon testStoreDebugUnitTest bundleStoreRelease assembleStoreRelease -PappVersionName="$VERSION"
+
+      - name: Collect, verify and summarise
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p out
+          cp app/build/outputs/bundle/storeRelease/app-store-release.aab "out/passkey-vault-$VERSION.aab"
+          cp app/build/outputs/apk/store/release/app-store-release.apk "out/passkey-vault-$VERSION.apk"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs "out/passkey-vault-$VERSION.apk" | tee out/apk-certificate.txt
+          jarsigner -verify "out/passkey-vault-$VERSION.aab" > /dev/null
+          # The store build must not be able to update itself.
+          scripts/check-store-build.sh "out/passkey-vault-$VERSION.apk" "out/passkey-vault-$VERSION.aab"
+          (cd out && sha256sum *.aab *.apk > SHA256SUMS.txt)
+          {
+            echo "## Store build v$VERSION"
+            echo "- \`passkey-vault-$VERSION.aab\`: upload to **Google Play Console** (and Indus if it accepts bundles)"
+            echo "- \`passkey-vault-$VERSION.apk\`: upload to **Indus Appstore** / stores that take APKs"
+            echo "- Signed with the same key as the GitHub releases; no self-updater."
+            echo ""
+            echo "Download the \`store-v$VERSION\` artifact below (kept 30 days)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: store-v${{ steps.version.outputs.version }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: error

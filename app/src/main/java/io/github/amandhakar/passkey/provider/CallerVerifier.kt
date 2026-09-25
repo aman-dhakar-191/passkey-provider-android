@@ -38,10 +38,10 @@ class CallerVerifier(private val context: Context) {
     fun verifyRpId(info: CallingAppInfo, origin: String, rpId: String) {
         if (!isValidDomain(rpId)) throw SecurityException("Invalid RP ID: $rpId")
         if (origin.startsWith("android:apk-key-hash:")) {
-            // The self-test (debug builds only, run by the emulator workflow): only this app itself may use
-            // the reserved test RP ID, which has no website to publish assetlinks.json on. Release builds
-            // have no exception at all.
-            if (BuildConfig.DEBUG && rpId == SELF_TEST_RP_ID && info.packageName == context.packageName) return
+            // The self-test (debug and CI-only "minified" builds, run by the emulator workflow): only this app
+            // itself may use the reserved test RP ID, which has no website to publish assetlinks.json on.
+            // Release builds have no exception at all.
+            if (BuildConfig.SELF_TEST && rpId == SELF_TEST_RP_ID && info.packageName == context.packageName) return
             val fingerprint = WebAuthnEncoding.sha256(currentCertificate(info.signingInfo))
             if (!DigitalAssetLinks.verify(rpId, info.packageName, OriginRules.fingerprint(fingerprint))) {
                 throw SecurityException("$rpId does not allow ${info.packageName} to use its passkeys")
