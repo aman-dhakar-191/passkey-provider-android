@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  # Branches are built through their pull request; pushing to main builds the merged result.
+  # (Building on every branch push too would run CI twice for each PR, e.g. Dependabot's.)
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
