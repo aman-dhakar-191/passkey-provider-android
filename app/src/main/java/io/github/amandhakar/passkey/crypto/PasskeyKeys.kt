@@ -7,6 +7,7 @@ import io.github.amandhakar.passkey.webauthn.Base64Url
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.ProviderException
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
@@ -28,6 +29,9 @@ object PasskeyKeys {
         try {
             generate(credentialId, strongBox = true)
         } catch (_: StrongBoxUnavailableException) {
+            generate(credentialId, strongBox = false)
+        } catch (_: ProviderException) {
+            // Some StrongBox chips claim support but reject this key configuration; use the TEE instead.
             generate(credentialId, strongBox = false)
         }
 

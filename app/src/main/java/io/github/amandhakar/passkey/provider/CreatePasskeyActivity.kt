@@ -32,8 +32,10 @@ class CreatePasskeyActivity : FragmentActivity() {
                     CreatePublicKeyCredentialResponse(createPasskey()),
                 )
             } catch (e: CreateCredentialException) {
+                if (e !is CreateCredentialCancellationException) ProviderErrors.record(this@CreatePasskeyActivity, "Creating passkey", e)
                 PendingIntentHandler.setCreateCredentialException(result, e)
             } catch (e: Exception) {
+                ProviderErrors.record(this@CreatePasskeyActivity, "Creating passkey", e)
                 PendingIntentHandler.setCreateCredentialException(
                     result,
                     CreateCredentialUnknownException(e.message ?: e.javaClass.simpleName),

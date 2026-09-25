@@ -43,6 +43,7 @@ import java.util.Date
 @Composable
 fun MainScreen(
     passkeysFlow: StateFlow<List<Passkey>>,
+    problemsFlow: StateFlow<String?>,
     providerEnabled: Boolean,
     updateState: UpdateState,
     updatesEnabled: Boolean,
@@ -52,8 +53,11 @@ fun MainScreen(
     onDelete: (Passkey) -> Unit,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: (Release) -> Unit,
+    onCopyProblems: () -> Unit,
+    onClearProblems: () -> Unit,
 ) {
     val passkeys by passkeysFlow.collectAsState()
+    val problems by problemsFlow.collectAsState()
     var pendingDelete by remember { mutableStateOf<Passkey?>(null) }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Passkeys") }) }) { padding ->
@@ -68,6 +72,7 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { ProviderCard(providerEnabled, onOpenProviderSettings) }
+            problems?.let { text -> item { ProblemsCard(text, onCopyProblems, onClearProblems) } }
             item { CrossDeviceCard(onScanQr) }
             if (updatesEnabled) item { UpdateCard(updateState, versionName, onCheckUpdate, onInstallUpdate) }
             item {
@@ -123,6 +128,24 @@ private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (!enabled) Button(onClick = onOpenSettings) { Text("Open settings") }
+        }
+    }
+}
+
+@Composable
+private fun ProblemsCard(text: String, onCopy: () -> Unit, onClear: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Recent problems", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text.lineSequence().take(3).joinToString("\n"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onCopy) { Text("Copy details") }
+                OutlinedButton(onClick = onClear) { Text("Clear") }
+            }
         }
     }
 }
