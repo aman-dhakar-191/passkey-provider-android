@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
 import androidx.annotation.RequiresApi
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.credentials.exceptions.ClearCredentialException
@@ -142,6 +143,11 @@ class PasskeyProviderService : CredentialProviderService() {
     @RequiresApi(35)
     private fun sheetBiometricPrompt(): BiometricPromptData? {
         if (!getSystemService(KeyguardManager::class.java).isDeviceSecure) return null
+        // Only with an enrolled strong biometric: without one the sheet has nothing to show and can get
+        // stuck (seen on an Android 16 emulator with only a PIN). Then the activity's own prompt is used.
+        if (BiometricManager.from(this).canAuthenticate(BIOMETRIC_STRONG) != BiometricManager.BIOMETRIC_SUCCESS) {
+            return null
+        }
         return BiometricPromptData.Builder()
             .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
             .build()

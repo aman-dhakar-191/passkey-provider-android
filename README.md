@@ -32,8 +32,9 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
 **Using the app:**
 - Passkeys are grouped by site. Search appears once you have more than three passkeys, and you can
   give a passkey a name (✏️). The name only shows on this phone, including in Android's sign-in sheet.
-- On **Android 15 and newer**, the fingerprint or screen-lock check happens inside Android's passkey
-  sheet, so choosing a passkey and verifying is one step. On Android 14, the app shows its own prompt
+- On **Android 15 and newer** with a fingerprint (or other strong biometric) enrolled, the check
+  happens inside Android's passkey sheet, so choosing a passkey and verifying is one step. The activity
+  log then says "User verified in Android's passkey sheet". On Android 14, the app shows its own prompt
   after you choose. Either way it's strong biometrics or the device PIN/pattern/password; those are
   what unlock the keys.
 
