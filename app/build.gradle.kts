@@ -1,8 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -22,7 +19,7 @@ val signingKeystore: String? = System.getenv("SIGNING_KEYSTORE_PATH")
 
 android {
     namespace = "io.github.amandhakar.passkey"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.amandhakar.passkey"
@@ -78,12 +75,6 @@ android {
     lint {
         abortOnError = true
         checkReleaseBuilds = false
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
