@@ -79,6 +79,7 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           fail-on-severity: moderate
+          show-openssf-scorecard: false # other projects' scores aren't something this repo can act on
           retry-on-snapshot-warnings: true
           comment-summary-in-pr: on-failure
 
