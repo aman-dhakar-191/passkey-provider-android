@@ -12,7 +12,8 @@ PERMISSIONS=(android.permission.REQUEST_INSTALL_PACKAGES android.permission.POST
 CODE=(
   'Lio/github/amandhakar/passkey/update/UpdateWorker;'
   'Lio/github/amandhakar/passkey/update/InstallResultReceiver;'
-  'Landroid/content/pm/PackageInstaller;'
+  # Writing an install session; only needed to install an APK. (Play services only lists sessions.)
+  'Landroid/content/pm/PackageInstaller$Session;'
   'Landroidx/work/'
   'api.github.com'
 )

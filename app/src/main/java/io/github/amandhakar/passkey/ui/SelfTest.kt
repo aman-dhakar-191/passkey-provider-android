@@ -24,8 +24,8 @@ import java.security.SecureRandom
 import java.security.Signature
 
 /**
- * Debug builds only (run by the emulator workflow). Goes through Android's Credential Manager exactly as
- * a website or app would, without a browser in between: creates a passkey, signs in with it, checks the
+ * Debug and CI-only "minified" builds (BuildConfig.SELF_TEST), run by the emulator workflow. Goes through
+ * Android's Credential Manager exactly as a website or app would, without a browser in between: creates a passkey, signs in with it, checks the
  * signature against the stored public key, then deletes the test passkey again.
  */
 object SelfTest {

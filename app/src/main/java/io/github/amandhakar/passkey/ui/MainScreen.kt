@@ -109,7 +109,7 @@ fun MainScreen(
                             text = { Text(if (updatesEnabled) "About & updates" else "About") },
                             onClick = { menuOpen = false; showAbout = true },
                         )
-                        if (BuildConfig.DEBUG) {
+                        if (BuildConfig.SELF_TEST) {
                             DropdownMenuItem(text = { Text("Test passkey") }, onClick = { menuOpen = false; onSelfTest() })
                         }
                     }

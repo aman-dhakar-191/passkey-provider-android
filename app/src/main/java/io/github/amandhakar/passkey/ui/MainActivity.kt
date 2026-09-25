@@ -34,7 +34,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
-    // Self-update only in the github channel's release builds (debug builds have another package name).
+    // Self-update only in the github channel's non-debug builds (debug builds have another package name).
+    // CI's "minified" build has it on too, so the emulator test starts WorkManager under R8.
     private val updatesEnabled = Updater.ENABLED && !BuildConfig.DEBUG
     private val providerEnabled = mutableStateOf(false)
     private val updateState = mutableStateOf<UpdateState>(UpdateState.Idle)
@@ -48,8 +49,8 @@ class MainActivity : FragmentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             if (savedInstanceState == null) checkForUpdate(quiet = true)
         }
-        // Used by the emulator test in CI (scripts/emulator_selftest.py); debug builds only.
-        if (BuildConfig.DEBUG && savedInstanceState == null && intent.getBooleanExtra(EXTRA_RUN_SELF_TEST, false)) {
+        // Used by the emulator test in CI (scripts/emulator_selftest.py); never in release builds.
+        if (BuildConfig.SELF_TEST && savedInstanceState == null && intent.getBooleanExtra(EXTRA_RUN_SELF_TEST, false)) {
             lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) }
         }
         val store = PasskeyStore.get(this)

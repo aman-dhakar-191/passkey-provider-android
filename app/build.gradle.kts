@@ -29,6 +29,8 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+        // The in-app passkey self-test and its reserved RP ID; never in release builds.
+        buildConfigField("boolean", "SELF_TEST", "false")
     }
 
     signingConfigs {
@@ -56,11 +58,14 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            buildConfigField("boolean", "SELF_TEST", "true")
         }
-        // A debug build (same package, debug key, self-test available) put through release's R8 settings.
+        // Release's R8 settings with the debug package, debug key and the self-test. Not debuggable, since
+        // R8 skips its optimizations for debuggable builds and this must behave like release.
         // Only CI uses it (.github/workflows/emulator.yml).
         create("minified") {
             initWith(getByName("debug"))
+            isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

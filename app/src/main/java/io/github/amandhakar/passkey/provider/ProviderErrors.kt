@@ -2,6 +2,7 @@ package io.github.amandhakar.passkey.provider
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import io.github.amandhakar.passkey.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +46,8 @@ object ProviderErrors {
 
     @Synchronized
     private fun append(context: Context, message: String) {
+        // The emulator test reads the log from logcat when the build is not debuggable ("minified").
+        if (BuildConfig.SELF_TEST) Log.i("PasskeyVault", message)
         val entry = "${DateFormat.getTimeInstance().format(Date())} $message"
         val previous = runCatching { file(context).readText() }.getOrDefault("")
             .split(SEPARATOR).filter { it.isNotBlank() }
