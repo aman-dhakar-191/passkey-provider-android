@@ -74,7 +74,12 @@ def act(nodes):
             shell(f"input text {PIN}")
             shell("input keyevent 66")
             return "entered PIN"
+    # Google's "create on another device" (QR code) path cannot finish on an emulator; only follow it
+    # if this provider is not offered at all, which the log then shows.
+    on_hybrid_screen = any("another device" in label(n).lower() for n in nodes)
     for pattern in TARGETS:
+        if on_hybrid_screen and pattern is not TARGETS[0]:
+            continue
         for node in nodes:
             text = label(node)
             if text and pattern.search(text) and not AVOID.search(text):
