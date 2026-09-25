@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.update.Release
 import kotlinx.coroutines.flow.StateFlow
@@ -132,7 +133,7 @@ private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit, onSelfTes
             // hard to find in Settings (its name and place differ between phone makers).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onOpenSettings) { Text("Passkey settings") }
-                OutlinedButton(onClick = onSelfTest) { Text("Test passkey") }
+                if (BuildConfig.DEBUG) OutlinedButton(onClick = onSelfTest) { Text("Test passkey") }
             }
         }
     }

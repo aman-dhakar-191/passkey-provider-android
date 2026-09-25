@@ -3,6 +3,7 @@ package io.github.amandhakar.passkey.provider
 import android.content.Context
 import android.content.pm.SigningInfo
 import androidx.credentials.provider.CallingAppInfo
+import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import io.github.amandhakar.passkey.webauthn.WebAuthnEncoding
 import org.json.JSONArray
@@ -39,9 +40,10 @@ class CallerVerifier(private val context: Context) {
     fun verifyRpId(info: CallingAppInfo, origin: String, rpId: String) {
         if (!isValidDomain(rpId)) throw SecurityException("Invalid RP ID: $rpId")
         if (origin.startsWith("android:apk-key-hash:")) {
-            // The in-app self-test: only this app itself may use the reserved test RP ID, and it has no
-            // website to publish assetlinks.json on. Other apps cannot run under this package name.
-            if (rpId == SELF_TEST_RP_ID && info.packageName == context.packageName) return
+            // The self-test (debug builds only, run by the emulator workflow): only this app itself may use
+            // the reserved test RP ID, which has no website to publish assetlinks.json on. Release builds
+            // have no exception at all.
+            if (BuildConfig.DEBUG && rpId == SELF_TEST_RP_ID && info.packageName == context.packageName) return
             val fingerprint = WebAuthnEncoding.sha256(currentCertificate(info.signingInfo))
             if (!DigitalAssetLinks.verify(rpId, info.packageName, fingerprint)) {
                 throw SecurityException("$rpId does not allow ${info.packageName} to use its passkeys")
