@@ -39,6 +39,9 @@ class CallerVerifier(private val context: Context) {
     fun verifyRpId(info: CallingAppInfo, origin: String, rpId: String) {
         if (!isValidDomain(rpId)) throw SecurityException("Invalid RP ID: $rpId")
         if (origin.startsWith("android:apk-key-hash:")) {
+            // The in-app self-test: only this app itself may use the reserved test RP ID, and it has no
+            // website to publish assetlinks.json on. Other apps cannot run under this package name.
+            if (rpId == SELF_TEST_RP_ID && info.packageName == context.packageName) return
             val fingerprint = WebAuthnEncoding.sha256(currentCertificate(info.signingInfo))
             if (!DigitalAssetLinks.verify(rpId, info.packageName, fingerprint)) {
                 throw SecurityException("$rpId does not allow ${info.packageName} to use its passkeys")
@@ -55,6 +58,9 @@ class CallerVerifier(private val context: Context) {
     }
 
     companion object {
+        /** Reserved RP ID for the self-test (.invalid can never be a real domain, RFC 2606). */
+        const val SELF_TEST_RP_ID = "selftest.passkey-provider.invalid"
+
         private val DOMAIN = Regex("^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
 
         fun isValidDomain(value: String) = DOMAIN.matches(value) && (value.contains('.') || value == "localhost")

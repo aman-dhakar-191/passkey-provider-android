@@ -50,6 +50,7 @@ fun MainScreen(
     versionName: String,
     onOpenProviderSettings: () -> Unit,
     onScanQr: () -> Unit,
+    onSelfTest: () -> Unit,
     onDelete: (Passkey) -> Unit,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: (Release) -> Unit,
@@ -71,7 +72,7 @@ fun MainScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ProviderCard(providerEnabled, onOpenProviderSettings) }
+            item { ProviderCard(providerEnabled, onOpenProviderSettings, onSelfTest) }
             problems?.let { text -> item { ProblemsCard(text, onCopyProblems, onClearProblems) } }
             item { CrossDeviceCard(onScanQr) }
             if (updatesEnabled) item { UpdateCard(updateState, versionName, onCheckUpdate, onInstallUpdate) }
@@ -115,7 +116,7 @@ fun MainScreen(
 }
 
 @Composable
-private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit) {
+private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit, onSelfTest: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -127,7 +128,12 @@ private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit) {
                 else "Turn this app on under Passwords, passkeys & accounts so apps and browsers can use it.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (!enabled) Button(onClick = onOpenSettings) { Text("Open settings") }
+            // Always shown: this is where the user picks the preferred passkey service, and that page is
+            // hard to find in Settings (its name and place differ between phone makers).
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onOpenSettings) { Text("Passkey settings") }
+                OutlinedButton(onClick = onSelfTest) { Text("Test passkey") }
+            }
         }
     }
 }
