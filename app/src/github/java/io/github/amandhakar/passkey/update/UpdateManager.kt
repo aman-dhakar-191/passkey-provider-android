@@ -14,15 +14,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-data class Release(
-    val version: String,
-    val apkUrl: String,
-    val apkSize: Long,
-    val sha256: String?,
-    val notes: String,
-    val pageUrl: String,
-)
-
 /**
  * Self-update from GitHub Releases of the public repo. Android itself guarantees the update is
  * signed with the same key as the installed app; we additionally check the SHA-256 GitHub reports

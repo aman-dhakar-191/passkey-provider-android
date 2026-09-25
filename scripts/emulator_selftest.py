@@ -16,7 +16,9 @@ import xml.etree.ElementTree as ET
 PKG = "io.github.amandhakar.passkey.debug"
 SERVICE = f"{PKG}/io.github.amandhakar.passkey.provider.PasskeyProviderService"
 ACTIVITY = f"{PKG}/io.github.amandhakar.passkey.ui.MainActivity"
-APK = "app/build/outputs/apk/github/debug/app-github-debug.apk"
+# BUILD_TYPE=minified tests the build with release's R8 settings.
+BUILD_TYPE = os.environ.get("BUILD_TYPE", "debug")
+APK = f"app/build/outputs/apk/github/{BUILD_TYPE}/app-github-{BUILD_TYPE}.apk"
 PIN = "1234"
 OUT = "emulator-output"
 TIMEOUT_S = 240

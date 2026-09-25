@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GitHub channel only: the self-updater (src/github/java/.../update). Store builds contain none of this. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <receiver
+            android:name="io.github.amandhakar.passkey.update.InstallResultReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

@@ -42,8 +42,9 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: v${{ steps.version.outputs.version }}
 
       - name: Check this version has a store build
@@ -64,12 +65,14 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-disabled: true # signed builds never use a cache an earlier run could have poisoned
 
       - name: Bundle privileged browser allowlist
         run: |
@@ -96,9 +99,7 @@ jobs:
           "$BT/apksigner" verify --print-certs "out/passkey-vault-$VERSION.apk" | tee out/apk-certificate.txt
           jarsigner -verify "out/passkey-vault-$VERSION.aab" > /dev/null
           # The store build must not be able to update itself.
-          if "$BT/aapt2" dump permissions "out/passkey-vault-$VERSION.apk" | grep -q REQUEST_INSTALL_PACKAGES; then
-            echo "::error::The store APK still requests REQUEST_INSTALL_PACKAGES"; exit 1
-          fi
+          scripts/check-store-build.sh "out/passkey-vault-$VERSION.apk" "out/passkey-vault-$VERSION.aab"
           (cd out && sha256sum *.aab *.apk > SHA256SUMS.txt)
           {
             echo "## Store build v$VERSION"
@@ -109,7 +110,7 @@ jobs:
             echo "Download the \`store-v$VERSION\` artifact below (kept 30 days)."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: store-v${{ steps.version.outputs.version }}
           path: out/

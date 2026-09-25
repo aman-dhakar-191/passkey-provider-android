@@ -27,8 +27,7 @@ import io.github.amandhakar.passkey.provider.PasskeyProviderService
 import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.provider.verifyUser
 import io.github.amandhakar.passkey.update.Release
-import io.github.amandhakar.passkey.update.UpdateManager
-import io.github.amandhakar.passkey.update.UpdateWorker
+import io.github.amandhakar.passkey.update.Updater
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,7 +35,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
     // Self-update only in the github channel's release builds (debug builds have another package name).
-    private val updatesEnabled = BuildConfig.SELF_UPDATE && !BuildConfig.DEBUG
+    private val updatesEnabled = Updater.ENABLED && !BuildConfig.DEBUG
     private val providerEnabled = mutableStateOf(false)
     private val updateState = mutableStateOf<UpdateState>(UpdateState.Idle)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -45,7 +44,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (updatesEnabled) {
-            UpdateWorker.schedule(this)
+            Updater.schedule(this)
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             if (savedInstanceState == null) checkForUpdate(quiet = true)
         }
@@ -156,8 +155,8 @@ class MainActivity : FragmentActivity() {
         updateState.value = UpdateState.Checking
         lifecycleScope.launch {
             updateState.value = try {
-                val release = withContext(Dispatchers.IO) { UpdateManager.latestRelease() }
-                if (release != null && UpdateManager.isNewer(release)) UpdateState.Available(release)
+                val release = withContext(Dispatchers.IO) { Updater.latestRelease() }
+                if (release != null && Updater.isNewer(release)) UpdateState.Available(release)
                 else if (quiet) UpdateState.Idle else UpdateState.UpToDate
             } catch (e: Exception) {
                 if (quiet) UpdateState.Idle else UpdateState.Error(e.message ?: "Update check failed")
@@ -166,7 +165,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun installUpdate(release: Release) {
-        if (!UpdateManager.canInstall(this)) {
+        if (!Updater.canInstall(this)) {
             toast("Allow this app to install updates, then tap Install again")
             startActivity(
                 Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
@@ -176,12 +175,12 @@ class MainActivity : FragmentActivity() {
         lifecycleScope.launch {
             try {
                 val apk = withContext(Dispatchers.IO) {
-                    UpdateManager.download(this@MainActivity, release) { p ->
+                    Updater.download(this@MainActivity, release) { p ->
                         runOnUiThread { updateState.value = UpdateState.Downloading(release, p) }
                     }
                 }
                 updateState.value = UpdateState.Installing
-                withContext(Dispatchers.IO) { UpdateManager.install(this@MainActivity, apk) }
+                withContext(Dispatchers.IO) { Updater.install(this@MainActivity, apk) }
             } catch (e: Exception) {
                 updateState.value = UpdateState.Error(e.message ?: "Update failed")
             }

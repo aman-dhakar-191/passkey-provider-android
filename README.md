@@ -21,7 +21,7 @@ Requires **Android 14 (API 34) or newer**, with a screen lock set up.
 | Anti-phishing: browser origin allowlist and Digital Asset Links check for apps | `provider/CallerVerifier.kt` |
 | WebAuthn authenticator (authenticator data, "none" attestation, ES256 signatures) | `provider/Authenticator.kt`, `webauthn/` |
 | Private keys (Android Keystore / StrongBox; they never leave the device) | `crypto/PasskeyKeys.kt` |
-| Self-update from GitHub Releases | `update/` |
+| Self-update from GitHub Releases (GitHub build only) | `app/src/github/.../update/` |
 
 **Desktop sign-in via QR code:** the QR code starts the FIDO *hybrid* protocol, which checks that
 the phone is physically near the computer over Bluetooth and then opens an encrypted tunnel. On
@@ -90,12 +90,19 @@ derived from it, so it always goes up.
 
 ## Release channels
 
-The same code builds two variants (Gradle product flavors):
+The same code (one branch) builds two variants, as Gradle product flavors:
 
 | Channel | Variant | Updates | How to release |
 |---|---|---|---|
 | **GitHub** (sideload) | `github` | the app updates itself from GitHub Releases | *Actions → Release* |
 | **Google Play / Indus Appstore** | `store` | by the store; no self-updater, no install-packages permission | release on GitHub first, then *Actions → Store release* (builds that version as a signed `.aab` + `.apk`) |
+
+The store variant doesn't just switch the updater off. The updater, its permissions and WorkManager
+live in `app/src/github/`, which the store build never compiles. The store build gets only a stub
+(`app/src/store/`). `scripts/check-store-build.sh` runs in CI and in *Store release*. It fails if the
+store APK/AAB contains the install-packages or notification permission, the updater classes, the
+package installer, WorkManager or the GitHub API. To prove the check itself works, it also checks
+that the same things *are* found in the GitHub build.
 
 Store listing text, Data-safety answers and signing notes are in
 [docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md).
@@ -131,9 +138,23 @@ above.
 
 ## Testing
 
-- **CI** (every PR): unit tests, lint, and debug and release builds.
+- **CI** (every PR): unit tests, lint, debug and release builds of both channels, and the
+  store-build check above.
+- **Release builds are shrunk with R8** (no renaming: the source is public, and readable stack traces
+  help). Because R8 once removed code that is only created by reflection, the emulator test runs on a
+  debug build *and* on a `minified` build with the release R8 settings.
+- **Security** (every PR, pushes to main, weekly; `.github/workflows/security.yml`):
+  - CodeQL static analysis with the security-extended queries; results are under *Security → Code
+    scanning*.
+  - The Gradle dependency graph is submitted to GitHub, so Dependabot alerts cover the app's real
+    dependencies. PRs fail if they add a dependency with a known moderate-or-worse vulnerability.
+  - gitleaks scans the whole history for committed secrets.
+  - zizmor audits the workflows.
+
+  The workflows are hardened: every action is pinned to a commit SHA (Dependabot updates the pins),
+  tokens are read-only unless a job needs more, and signed release builds don't use the Gradle cache.
 - **Emulator test** (every PR, `.github/workflows/emulator.yml`): boots Android 14 and 16
-  emulators and makes the app the passkey provider. It then asks Credential Manager to create a
+  emulators, once for the debug build and once for the R8-minified one, and makes the app the passkey provider. It then asks Credential Manager to create a
   passkey and sign in with it, and checks the signature. `scripts/emulator_selftest.py` taps through
   the system sheets and PIN prompts. Screenshots, the app's log and logcat are uploaded as artifacts.
   The self-test runs only in debug builds. It uses the reserved RP ID
