@@ -88,9 +88,11 @@ class MainActivity : FragmentActivity() {
     }.getOrDefault(false)
 
     private fun openProviderSettings() {
+        // The first opens "Passwords, passkeys & accounts" (preferred service + on/off switches) on
+        // Android 14+. Some phone makers only handle the variant with our package, or none of them.
         val intents = listOf(
-            Intent("android.settings.CREDENTIAL_PROVIDER").setData(Uri.parse("package:$packageName")),
             Intent("android.settings.CREDENTIAL_PROVIDER"),
+            Intent("android.settings.CREDENTIAL_PROVIDER").setData(Uri.parse("package:$packageName")),
             Intent(Settings.ACTION_SETTINGS),
         )
         for (intent in intents) {

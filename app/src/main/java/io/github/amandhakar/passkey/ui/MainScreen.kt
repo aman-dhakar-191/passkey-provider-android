@@ -128,8 +128,12 @@ private fun ProviderCard(enabled: Boolean, onOpenSettings: () -> Unit, onSelfTes
                 else "Turn this app on under Passwords, passkeys & accounts so apps and browsers can use it.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (!enabled) Button(onClick = onOpenSettings) { Text("Open settings") }
-            OutlinedButton(onClick = onSelfTest) { Text("Test creating a passkey") }
+            // Always shown: this is where the user picks the preferred passkey service, and that page is
+            // hard to find in Settings (its name and place differ between phone makers).
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onOpenSettings) { Text("Passkey settings") }
+                OutlinedButton(onClick = onSelfTest) { Text("Test passkey") }
+            }
         }
     }
 }
