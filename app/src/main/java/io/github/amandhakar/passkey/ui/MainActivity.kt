@@ -35,6 +35,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
+    // Self-update only in the github channel's release builds (debug builds have another package name).
+    private val updatesEnabled = BuildConfig.SELF_UPDATE && !BuildConfig.DEBUG
     private val providerEnabled = mutableStateOf(false)
     private val updateState = mutableStateOf<UpdateState>(UpdateState.Idle)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -42,7 +44,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (BuildConfig.UPDATES_ENABLED) {
+        if (updatesEnabled) {
             UpdateWorker.schedule(this)
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             if (savedInstanceState == null) checkForUpdate(quiet = true)
@@ -59,7 +61,7 @@ class MainActivity : FragmentActivity() {
                     problemsFlow = ProviderErrors.latest,
                     providerEnabled = providerEnabled.value,
                     updateState = updateState.value,
-                    updatesEnabled = BuildConfig.UPDATES_ENABLED,
+                    updatesEnabled = this.updatesEnabled,
                     versionName = BuildConfig.VERSION_NAME,
                     onOpenProviderSettings = ::openProviderSettings,
                     onScanQr = ::scanQr,

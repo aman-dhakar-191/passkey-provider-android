@@ -30,7 +30,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleGithubDebug
 
       - name: Enable KVM
         run: |

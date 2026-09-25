@@ -89,7 +89,7 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           VERSION: ${{ steps.version.outputs.version }}
-        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease -PappVersionName="$VERSION"
+        run: ./gradlew --no-daemon testGithubDebugUnitTest assembleGithubRelease -PappVersionName="$VERSION"
 
       - name: Verify signature and checksum
         id: apk
@@ -97,7 +97,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           APK="passkey-provider-$VERSION.apk"
-          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          cp app/build/outputs/apk/github/release/app-github-release.apk "$APK"
           APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
           "$APKSIGNER" verify --print-certs "$APK"
           sha256sum "$APK" > "$APK.sha256"

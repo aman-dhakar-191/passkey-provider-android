@@ -33,8 +33,8 @@ jobs:
           curl -fsSL https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json \
             -o app/src/main/assets/privileged_browsers.json
 
-      - name: Unit tests, lint, debug and (unsigned) release build
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease
+      - name: Unit tests, lint, and debug + (unsigned) release builds of both channels
+        run: ./gradlew --no-daemon testGithubDebugUnitTest lintGithubDebug lintStoreDebug assembleGithubDebug assembleGithubRelease assembleStoreRelease bundleStoreRelease
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -46,4 +46,4 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/github/debug/*.apk

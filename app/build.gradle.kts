@@ -25,7 +25,8 @@ android {
         applicationId = "io.github.amandhakar.passkey"
         // Third-party credential providers need the Credential Manager framework from Android 14.
         minSdk = 34
-        targetSdk = 35
+        // Play requires targeting a recent Android release; 36 = Android 16.
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
         buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
@@ -48,13 +49,26 @@ android {
             // v1.0.1 crashed on launch. The app is sideloaded, so a few MB saved is not worth that risk.
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
-            buildConfigField("boolean", "UPDATES_ENABLED", "true")
         }
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            // Debug builds have a different package name, so self-updating from releases makes no sense.
-            buildConfigField("boolean", "UPDATES_ENABLED", "false")
+        }
+    }
+
+    // Two release channels from the same code:
+    //  - github: sideloaded from GitHub Releases, updates itself (REQUEST_INSTALL_PACKAGES).
+    //  - store:  Google Play / Indus Appstore. Stores deliver updates, so no self-updater, no
+    //            install-packages or notification permission (removed in src/store/AndroidManifest.xml).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE", "true")
+        }
+        create("store") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE", "false")
         }
     }
 

@@ -52,7 +52,7 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
 ## Building
 
 ```bash
-./gradlew testDebugUnitTest assembleDebug     # debug APK in app/build/outputs/apk/debug/
+./gradlew testGithubDebugUnitTest assembleGithubDebug   # debug APK in app/build/outputs/apk/github/debug/
 ```
 
 Debug builds use the package `io.github.amandhakar.passkey.debug` and have self-update turned off.
@@ -87,6 +87,18 @@ Debug builds use the package `io.github.amandhakar.passkey.debug` and have self-
 
 The version must be `MAJOR.MINOR.PATCH`, with each part between 0 and 99. The `versionCode` is
 derived from it, so it always goes up.
+
+## Release channels
+
+The same code builds two variants (Gradle product flavors):
+
+| Channel | Variant | Updates | How to release |
+|---|---|---|---|
+| **GitHub** (sideload) | `github` | the app updates itself from GitHub Releases | *Actions → Release* |
+| **Google Play / Indus Appstore** | `store` | by the store; no self-updater, no install-packages permission | release on GitHub first, then *Actions → Store release* (builds that version as a signed `.aab` + `.apk`) |
+
+Store listing text, Data-safety answers and signing notes are in
+[docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md).
 
 ## Installing and updating
 
