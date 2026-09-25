@@ -97,6 +97,11 @@ def main():
     shell(f"settings put secure credential_service_primary {SERVICE}")
     print("credential_service =", shell("settings get secure credential_service").strip())
     print("credential_service_primary =", shell("settings get secure credential_service_primary").strip())
+    # Credential Manager picks up a newly installed + enabled provider asynchronously; starting the
+    # request straight away races it and the provider is left out of the request.
+    time.sleep(20)
+    dump = shell("dumpsys credential")
+    print("===== dumpsys credential =====\n" + dump[:4000])
     shell("logcat -c")
     print(shell(f"am start -W -n {ACTIVITY} --ez run_self_test true"))
 
