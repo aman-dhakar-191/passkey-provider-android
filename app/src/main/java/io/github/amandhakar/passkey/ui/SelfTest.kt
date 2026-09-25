@@ -1,11 +1,13 @@
 package io.github.amandhakar.passkey.ui
 
 import android.app.Activity
+import android.os.Build
 import androidx.credentials.CreatePublicKeyCredentialRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.CreateCredentialNoCreateOptionException
+import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.provider.CallerVerifier
 import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.webauthn.Base64Url
@@ -34,7 +36,12 @@ object SelfTest {
             .put("authenticatorSelection", JSONObject().put("residentKey", "required").put("userVerification", "required"))
             .put("attestation", "none")
             .put("timeout", 120_000)
-        ProviderErrors.note(activity, "Self-test: asking Android to create a passkey")
+        ProviderErrors.note(
+            activity,
+            "Self-test: asking Android to create a passkey (app ${BuildConfig.VERSION_NAME}, " +
+                "Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}, ${Build.MANUFACTURER} ${Build.MODEL}, " +
+                "${Build.DISPLAY})",
+        )
         val message = try {
             CredentialManager.create(activity)
                 .createCredential(activity, CreatePublicKeyCredentialRequest(request.toString()))
