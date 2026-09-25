@@ -9,7 +9,7 @@ any of it. There is no account, no server, no analytics, no ads and no tracking.
 
 ## 1. Who we are
 Passkey Vault is made by **Aman Dhakar**, an individual developer in India ("we", "us"). For any
-question about this policy or your data, email **amandhaker191@gmail.com** or open an issue at
+question about this policy or your data, email [amandhaker191@gmail.com](mailto:amandhaker191@gmail.com) or open an issue at
 https://github.com/aman-dhakar-191/passkey-provider-android/issues.
 
 ## 2. Information the app keeps on your phone
@@ -93,7 +93,7 @@ access, correct or erase your personal data, withdraw consent, and (in India) no
 for you. Because all data is on your phone and under your control, you can do all of this in the app
 yourself. We hold no data about you to access or erase.
 
-**Grievance contact:** Aman Dhakar, amandhaker191@gmail.com. We reply within 30 days. In India, if
+**Grievance contact:** Aman Dhakar, [amandhaker191@gmail.com](mailto:amandhaker191@gmail.com). We reply within 30 days. In India, if
 you're not satisfied, you can complain to the Data Protection Board of India; in the EU, to your data
 protection authority.
 

@@ -35,7 +35,7 @@ def inline(text):
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<![\w/])_([^_]+)_(?!\w)", r"<em>\1</em>", text)
     # [text](url) links, then bare links; neither inside <code> or an existing tag.
-    text = re.sub(r"\[([^\]]+)\]\((https://[^)\s]+)\)", r'<a href="\2">\1</a>', text)
+    text = re.sub(r"\[([^\]]+)\]\(((?:https://|mailto:)[^)\s]+)\)", r'<a href="\2">\1</a>', text)
     parts = re.split(r"(<code>.*?</code>|<a [^>]*>.*?</a>)", text)
     parts = [p if p.startswith(("<code>", "<a ")) else
              re.sub(r"(https://[^\s<)]+[^\s<).,])", r'<a href="\1">\1</a>', p) for p in parts]

@@ -8,7 +8,7 @@ backed up, so keep another way to sign in to your important accounts.
 
 ## 1. Who we are
 Passkey Vault is made by **Aman Dhakar**, an individual developer in India ("we", "us"). Contact:
-**amandhaker191@gmail.com** or https://github.com/aman-dhakar-191/passkey-provider-android/issues.
+[amandhaker191@gmail.com](mailto:amandhaker191@gmail.com) or https://github.com/aman-dhakar-191/passkey-provider-android/issues.
 
 ## 2. What the app does
 Passkey Vault is a passkey manager. It creates passkeys on your phone and uses them to sign you in to
@@ -70,4 +70,4 @@ These terms are governed by the laws of India, and the courts of India have juri
 affecting any mandatory consumer rights you have where you live.
 
 ## 13. Contact
-Questions about these terms: **amandhaker191@gmail.com**.
+Questions about these terms: [amandhaker191@gmail.com](mailto:amandhaker191@gmail.com).
