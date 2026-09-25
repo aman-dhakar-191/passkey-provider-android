@@ -15,6 +15,7 @@ import androidx.credentials.provider.BeginCreatePublicKeyCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialResponse
 import androidx.credentials.provider.BeginGetPublicKeyCredentialOption
+import androidx.credentials.provider.CallingAppInfo
 import androidx.credentials.provider.CreateEntry
 import androidx.credentials.provider.CredentialEntry
 import androidx.credentials.provider.CredentialProviderService
@@ -91,10 +92,19 @@ class PasskeyProviderService : CredentialProviderService() {
         for (option in request.beginGetCredentialOptions) {
             if (option !is BeginGetPublicKeyCredentialOption) continue
             val options = runCatching { AssertionOptions.parse(option.requestJson) }.getOrNull() ?: continue
-            val rpId = options.rpId ?: continue
+            // rpId is optional in WebAuthn sign-in requests; it then defaults to the page's own host.
+            val rpId = options.rpId ?: request.callingAppInfo?.let { originHost(it) }
             val allowed = options.allowCredentialIds.map { Base64Url.encode(it) }.toSet()
-            store.forRp(rpId)
+            val matching = if (rpId == null) emptyList() else store.forRp(rpId)
                 .filter { allowed.isEmpty() || it.credentialId in allowed }
+            ProviderErrors.note(
+                this,
+                "Sign-in asked by ${request.callingAppInfo?.packageName ?: "unknown caller"} for " +
+                    "${rpId ?: "unknown site"}${if (options.rpId == null) " (site taken from the page)" else ""}: " +
+                    "${matching.size} passkey(s) offered, ${allowed.size} allowed by the site, " +
+                    "passkeys saved for: ${store.all().map { it.rpId }.distinct().ifEmpty { listOf("none") }}",
+            )
+            matching
                 .sortedByDescending { it.lastUsedAt }
                 .forEach { passkey ->
                     entries += PublicKeyCredentialEntry.Builder(
@@ -108,15 +118,14 @@ class PasskeyProviderService : CredentialProviderService() {
                         .build()
                 }
         }
-        if (request.beginGetCredentialOptions.any { it is BeginGetPublicKeyCredentialOption }) {
-            ProviderErrors.note(
-                this,
-                "Sign-in asked by ${request.callingAppInfo?.packageName ?: "unknown caller"}: " +
-                    "${entries.size} passkey(s) offered",
-            )
-        }
         callback.onResult(BeginGetCredentialResponse(credentialEntries = entries))
     }
+
+    /** Host of a browser caller's page, or null for apps (their requests must name the rpId). */
+    private fun originHost(info: CallingAppInfo): String? = runCatching {
+        if (!info.isOriginPopulated()) return null
+        CallerVerifier.hostOf(CallerVerifier(this).resolveOrigin(info))
+    }.getOrNull()
 
     override fun onClearCredentialStateRequest(
         request: ProviderClearCredentialStateRequest,

@@ -65,6 +65,10 @@ class GetPasskeyActivity : FragmentActivity() {
                 verifier.verifyRpId(request.callingAppInfo, it, passkey.rpId)
             }
         }
+        // Without an rpId the request is for the page's own host exactly (WebAuthn §5.1.4.1), not a parent domain.
+        if (options.rpId == null && CallerVerifier.hostOf(origin) != passkey.rpId) {
+            throw GetCredentialUnknownException("Passkey belongs to a different site")
+        }
 
         if (!verifyUser("Sign in with passkey", "${passkey.userName} on ${passkey.rpId}")) {
             throw GetCredentialCancellationException("User cancelled")
