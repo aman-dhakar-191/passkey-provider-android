@@ -107,6 +107,12 @@ that the same things *are* found in the GitHub build.
 Store listing text, Data-safety answers and signing notes are in
 [docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md).
 
+**Website:** https://aman-dhakar-191.github.io/passkey-provider-android/, with the privacy policy at
+[`/privacy/`](https://aman-dhakar-191.github.io/passkey-provider-android/privacy/). It's built from `site/`,
+`PRIVACY.md` and the store screenshots by `scripts/build_site.py`, and deployed by the *Website*
+workflow on every change to `main`. Its "last changed" dates come from git, so edit `PRIVACY.md` and the
+date updates itself.
+
 ## Installing and updating
 
 1. Download the APK from the latest [release](../../releases/latest) and install it.
