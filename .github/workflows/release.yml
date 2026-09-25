@@ -103,7 +103,9 @@ jobs:
           APK="passkey-provider-$VERSION.apk"
           cp app/build/outputs/apk/github/release/app-github-release.apk "$APK"
           APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
-          "$APKSIGNER" verify --print-certs "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apk-signature.txt"
+          grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" "$RUNNER_TEMP/apk-signature.txt" \
+            || { echo "::error::APK is not signed with APK Signature Scheme v3"; exit 1; }
           sha256sum "$APK" > "$APK.sha256"
           echo "file=$APK" >> "$GITHUB_OUTPUT"
 

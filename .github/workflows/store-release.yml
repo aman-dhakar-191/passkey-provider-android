@@ -96,7 +96,10 @@ jobs:
           cp app/build/outputs/bundle/storeRelease/app-store-release.aab "out/passkey-vault-$VERSION.aab"
           cp app/build/outputs/apk/store/release/app-store-release.apk "out/passkey-vault-$VERSION.apk"
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          "$BT/apksigner" verify --print-certs "out/passkey-vault-$VERSION.apk" | tee out/apk-certificate.txt
+          "$BT/apksigner" verify --verbose --print-certs "out/passkey-vault-$VERSION.apk" | tee out/apk-certificate.txt
+          # Stores check the v3 signature block (it carries the signing-key lineage).
+          grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" out/apk-certificate.txt \
+            || { echo "::error::APK is not signed with APK Signature Scheme v3"; exit 1; }
           jarsigner -verify "out/passkey-vault-$VERSION.aab" > /dev/null
           # The store build must not be able to update itself.
           scripts/check-store-build.sh "out/passkey-vault-$VERSION.apk" "out/passkey-vault-$VERSION.aab"

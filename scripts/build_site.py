@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Builds the GitHub Pages site into _site/ (used by .github/workflows/pages.yml).
 
-site/ holds the landing page; the privacy page is generated from PRIVACY.md so there is one copy of the
-policy. "Last changed" dates come from git, so they can't go stale. Needs git history for those files
-(the workflow checks out with fetch-depth: 0). Only handles the Markdown PRIVACY.md uses: headings,
-paragraphs, "- " lists with indented continuation lines, **bold**, _italic_, `code` and bare links.
+site/ holds the landing page; the privacy and terms pages are generated from PRIVACY.md and TERMS.md, so
+there is one copy of each. "Last changed" dates come from git, so they can't go stale. Needs git history
+for those files (the workflow checks out with fetch-depth: 0). Only handles the Markdown those files use: headings,
+paragraphs, "- " lists with indented continuation lines, **bold**, _italic_, `code`, [links](url) and
+bare links.
 """
 import datetime
 import html
@@ -33,10 +34,11 @@ def inline(text):
     text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<![\w/])_([^_]+)_(?!\w)", r"<em>\1</em>", text)
-    # Bare links, but not ones inside <code>.
-    parts = re.split(r"(<code>.*?</code>)", text)
-    parts = [p if p.startswith("<code>") else re.sub(r"(https://[^\s<)]+[^\s<).,])", r'<a href="\1">\1</a>', p)
-             for p in parts]
+    # [text](url) links, then bare links; neither inside <code> or an existing tag.
+    text = re.sub(r"\[([^\]]+)\]\((https://[^)\s]+)\)", r'<a href="\2">\1</a>', text)
+    parts = re.split(r"(<code>.*?</code>|<a [^>]*>.*?</a>)", text)
+    parts = [p if p.startswith(("<code>", "<a ")) else
+             re.sub(r"(https://[^\s<)]+[^\s<).,])", r'<a href="\1">\1</a>', p) for p in parts]
     return "".join(parts)
 
 
@@ -80,14 +82,16 @@ def main():
 
     index = OUT / "index.html"
     index.write_text(index.read_text().replace(
-        "{{SITE_UPDATED}}", last_changed("site", "docs/store", "PRIVACY.md")))
+        "{{SITE_UPDATED}}", last_changed("site", "docs/store", "PRIVACY.md", "TERMS.md")))
 
-    privacy = (ROOT / "site/privacy.template.html").read_text()
-    privacy = (privacy.replace("{{CONTENT}}", markdown((ROOT / "PRIVACY.md").read_text()))
-               .replace("{{UPDATED}}", last_changed("PRIVACY.md"))
-               .replace("{{HISTORY}}", f"{REPO}/commits/main/PRIVACY.md"))
-    (OUT / "privacy").mkdir()
-    (OUT / "privacy/index.html").write_text(privacy)
+    template = (ROOT / "site/page.template.html").read_text()
+    for source, slug, title in (("PRIVACY.md", "privacy", "Privacy policy"), ("TERMS.md", "terms", "Terms of use")):
+        page = (template.replace("{{TITLE}}", title)
+                .replace("{{CONTENT}}", markdown((ROOT / source).read_text()))
+                .replace("{{UPDATED}}", last_changed(source))
+                .replace("{{HISTORY}}", f"{REPO}/commits/main/{source}"))
+        (OUT / slug).mkdir()
+        (OUT / slug / "index.html").write_text(page)
 
     for page in OUT.rglob("*.html"):
         if "{{" in page.read_text():

@@ -1,14 +1,14 @@
 name: Website
 
-# Builds the GitHub Pages site (landing page + privacy policy) from site/, PRIVACY.md and docs/store/.
+# Builds the GitHub Pages site (landing page, privacy policy, terms of use) from site/, PRIVACY.md and docs/store/.
 # PRs only build it (so a broken page fails before merge); main deploys it to
 # https://aman-dhakar-191.github.io/passkey-provider-android/
 on:
   push:
     branches: [main]
-    paths: [site/**, PRIVACY.md, docs/store/**, scripts/build_site.py, .github/workflows/pages.yml]
+    paths: [site/**, PRIVACY.md, TERMS.md, docs/store/**, scripts/build_site.py, .github/workflows/pages.yml]
   pull_request:
-    paths: [site/**, PRIVACY.md, docs/store/**, scripts/build_site.py, .github/workflows/pages.yml]
+    paths: [site/**, PRIVACY.md, TERMS.md, docs/store/**, scripts/build_site.py, .github/workflows/pages.yml]
   workflow_dispatch:
 
 concurrency:

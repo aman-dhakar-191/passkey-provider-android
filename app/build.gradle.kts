@@ -40,6 +40,9 @@ android {
                 storePassword = System.getenv("SIGNING_STORE_PASSWORD")
                 keyAlias = System.getenv("SIGNING_KEY_ALIAS")
                 keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                // v3 carries the signing-key lineage that stores (e.g. Indus) check; v2 for older verifiers.
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
