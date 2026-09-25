@@ -19,7 +19,7 @@ val signingKeystore: String? = System.getenv("SIGNING_KEYSTORE_PATH")
 
 android {
     namespace = "io.github.amandhakar.passkey"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.amandhakar.passkey"
