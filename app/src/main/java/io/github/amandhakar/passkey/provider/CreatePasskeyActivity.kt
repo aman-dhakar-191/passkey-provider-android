@@ -99,5 +99,4 @@ class CreatePasskeyActivity : FragmentActivity() {
             .put("extensions", o.optJSONObject("extensions"))
             .toString()
     }.getOrElse { "unparsable request: ${it.message}" }
-    }
 }
