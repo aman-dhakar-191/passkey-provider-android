@@ -11,3 +11,4 @@ build/
 *.keystore
 # downloaded by CI at build time
 app/src/main/assets/privileged_browsers.json
+__pycache__/
