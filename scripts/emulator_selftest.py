@@ -69,13 +69,23 @@ def label(node):
 
 def act(nodes):
     """Performs one UI step. Returns a description of what was done, or None."""
-    # Emulators often show "<app> isn't responding" (usually the launcher); keep waiting.
+    # Emulators often show "<app> isn't responding" (usually the launcher). Waiting just brings it back and
+    # the dialog swallows the next tap, so close that app instead (never our own).
     if any("isn't responding" in label(n) or "isn’t responding" in label(n) for n in nodes):
+        ours = any("Passkey" in label(n) and "responding" in label(n) for n in nodes)
         for node in nodes:
-            if label(node).lower() == "wait":
+            if label(node).lower() == ("wait" if ours else "close app"):
                 x, y = center(node)
                 shell(f"input tap {x} {y}")
-                return "dismissed 'not responding' dialog"
+                return f"answered 'not responding' dialog with '{label(node)}'"
+    # The screen can lock (a PIN is set); unlock it with the test PIN.
+    if any(label(n) == "Device locked" for n in nodes):
+        shell("input keyevent 224")
+        shell("wm dismiss-keyguard")
+        time.sleep(1)
+        shell(f"input text {PIN}")
+        shell("input keyevent 66")
+        return "unlocked the screen"
     for node in nodes:
         if node.get("class", "").endswith("EditText") and node.get("password") == "true":
             x, y = center(node)
@@ -101,9 +111,6 @@ def act(nodes):
 def main():
     os.makedirs(OUT, exist_ok=True)
     print(run("install", "-r", APK))
-    # The emulator's launcher often stops responding and its dialog swallows taps; the test does not need
-    # a home screen, so switch it off.
-    print("disable launcher:", shell("pm disable-user --user 0 com.google.android.apps.nexuslauncher").strip())
     print("set PIN:", shell(f"locksettings set-pin {PIN}").strip())
     shell(f"settings put secure credential_service {SERVICE}")
     shell(f"settings put secure credential_service_primary {SERVICE}")
