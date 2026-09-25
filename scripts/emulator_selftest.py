@@ -67,6 +67,13 @@ def label(node):
 
 def act(nodes):
     """Performs one UI step. Returns a description of what was done, or None."""
+    # Emulators often show "<app> isn't responding" (usually the launcher); keep waiting.
+    if any("isn't responding" in label(n) or "isn’t responding" in label(n) for n in nodes):
+        for node in nodes:
+            if label(node).lower() == "wait":
+                x, y = center(node)
+                shell(f"input tap {x} {y}")
+                return "dismissed 'not responding' dialog"
     for node in nodes:
         if node.get("class", "").endswith("EditText") and node.get("password") == "true":
             x, y = center(node)
