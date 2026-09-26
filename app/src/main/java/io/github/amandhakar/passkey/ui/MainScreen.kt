@@ -1,21 +1,30 @@
 package io.github.amandhakar.passkey.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
@@ -45,6 +54,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.amandhakar.passkey.BuildConfig
@@ -197,7 +209,12 @@ fun MainScreen(
             title = { Text("Activity log") },
             text = {
                 Text(
-                    log ?: "Nothing yet. Passkey requests from apps and browsers are recorded here.",
+                    log ?: if (BuildConfig.LOG_ALL_REQUESTS) {
+                        "Nothing yet. Passkey requests from apps and browsers are recorded here."
+                    } else {
+                        "Nothing yet. If a passkey request goes wrong, the details are kept here so you can copy " +
+                            "them for support. Successful sign-ins aren't recorded."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
@@ -216,15 +233,36 @@ fun MainScreen(
     }
 
     if (showAbout) {
+        val uriHandler = LocalUriHandler.current
+        val context = LocalContext.current
+        // openUri throws if nothing on the phone can open the link (e.g. no email app).
+        val open: (String) -> Unit = { uri ->
+            runCatching { uriHandler.openUri(uri) }
+                .onFailure { Toast.makeText(context, "No app to open $uri", Toast.LENGTH_LONG).show() }
+        }
         AlertDialog(
             onDismissRequest = { showAbout = false },
-            title = { Text("Passkey Vault $versionName") },
+            title = { Text("Passkey Vault") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                ) {
                     Text(
-                        "Passkeys are created in this phone's secure hardware and never leave it. " +
-                            "They are not backed up, so keep another way to sign in to important accounts.",
+                        "Sign in with your fingerprint instead of a password. Your keys never leave this phone " +
+                            "and aren't backed up, so keep another way to sign in to important accounts.",
                         style = MaterialTheme.typography.bodySmall,
+                    )
+                    AboutLink(Icons.Filled.Lock, "Privacy policy") { open(Links.PRIVACY) }
+                    AboutLink(Icons.Filled.Info, "Terms of use") { open(Links.TERMS) }
+                    AboutLink(Icons.Filled.Home, "Website") { open(Links.WEBSITE) }
+                    AboutLink(Icons.Filled.Email, "Contact support") { open("mailto:${Links.SUPPORT_EMAIL}") }
+                    AboutLink(Icons.Filled.Build, "Source code (Apache License 2.0)") { open(Links.SOURCE) }
+                    Text(
+                        "Version $versionName · Made by Aman Dhakar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                     if (updatesEnabled) UpdatePanel(updateState, versionName, onCheckUpdate, onInstallUpdate, inDialog = true)
                 }
@@ -275,6 +313,15 @@ fun MainScreen(
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun AboutLink(icon: ImageVector, label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, modifier = Modifier.weight(1f))
     }
 }
 

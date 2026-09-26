@@ -85,10 +85,14 @@ android {
     productFlavors {
         create("github") {
             dimension = "distribution"
+            // Activity log: every step of every request (this is the channel used for debugging).
+            buildConfigField("boolean", "LOG_ALL_REQUESTS", "true")
             buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
         }
         create("store") {
             dimension = "distribution"
+            // Activity log: only requests that went wrong, with the steps that led to it.
+            buildConfigField("boolean", "LOG_ALL_REQUESTS", "false")
         }
     }
 
