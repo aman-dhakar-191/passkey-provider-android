@@ -99,6 +99,7 @@ fun MainScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showLog by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showPhoneHelp by remember { mutableStateOf(false) }
     val groups = remember(passkeys, query) { PasskeyGroups.of(passkeys, query) }
     val lastEntry = log?.substringBefore("\n----------")
     val lastFailed = lastEntry?.contains("FAILED") == true
@@ -117,6 +118,10 @@ fun MainScreen(
                             onClick = { menuOpen = false; onOpenProviderSettings() },
                         )
                         DropdownMenuItem(text = { Text("Activity log") }, onClick = { menuOpen = false; showLog = true })
+                        DropdownMenuItem(
+                            text = { Text("New or lost phone?") },
+                            onClick = { menuOpen = false; showPhoneHelp = true },
+                        )
                         DropdownMenuItem(
                             text = { Text(if (updatesEnabled) "About & updates" else "About") },
                             onClick = { menuOpen = false; showAbout = true },
@@ -232,6 +237,53 @@ fun MainScreen(
         )
     }
 
+    if (showPhoneHelp) {
+        AlertDialog(
+            onDismissRequest = { showPhoneHelp = false },
+            title = { Text("New or lost phone?") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        "Your passkeys live only on this phone and can't be copied to another one. " +
+                            "A few minutes now saves you from being locked out later.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    HelpSection(
+                        "Before you need it",
+                        "For your important accounts, add a second passkey on another device (a second phone, " +
+                            "tablet or computer). Most sites let you have several.",
+                        "Keep another way to sign in: a password, recovery codes, or an up-to-date email and phone " +
+                            "number on the account.",
+                    )
+                    HelpSection(
+                        "Getting a new phone",
+                        "Keep the old phone until you're done.",
+                        "Install Passkey Vault on the new phone and turn it on.",
+                        "On the new phone, sign in to each site (you can scan the site's QR code with the old phone), " +
+                            "then add a new passkey in the site's security settings.",
+                        "When everything works, remove the old phone's passkeys in each site's settings and in this app.",
+                    )
+                    HelpSection(
+                        "Lost or stolen phone",
+                        "Nobody can use your passkeys without that phone's fingerprint or screen lock.",
+                        "Sign in another way: a password reset, recovery codes, or a passkey on another device.",
+                        "In each site's security settings, remove the passkey from the lost phone, then create a new " +
+                            "one on your new phone.",
+                    )
+                    Text(
+                        "Passkey Vault never has a copy of your passkeys, so we can't restore them for you.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { showPhoneHelp = false }) { Text("Close") } },
+        )
+    }
+
     if (showAbout) {
         val uriHandler = LocalUriHandler.current
         val context = LocalContext.current
@@ -313,6 +365,14 @@ fun MainScreen(
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun HelpSection(title: String, vararg steps: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        steps.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
     }
 }
 

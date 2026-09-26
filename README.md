@@ -30,6 +30,8 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
 **Google Play services and Bluetooth**.
 
 **Using the app:**
+- **⋮ → New or lost phone?** explains how to avoid being locked out: add a second passkey on another
+  device, keep a recovery method, and what to do when changing or losing a phone.
 - Passkeys are grouped by site. Search appears once you have more than three passkeys, and you can
   give a passkey a name (✏️). The name only shows on this phone, including in Android's sign-in sheet.
 - On **Android 15 and newer** with a fingerprint (or other strong biometric) enrolled, the check
