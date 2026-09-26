@@ -3,16 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{TITLE}} · Passkey Vault</title>
+  <title>{{TITLE}}: Passkey Vault</title>
   <meta name="description" content="{{TITLE}} for Passkey Vault, the Android passkey manager.">
   <link rel="icon" href="../icon.png">
   <link rel="stylesheet" href="../style.css">
 </head>
 <body>
-  <header class="page-head">
-    <div class="wrap"><a class="brand" href="../"><img src="../icon.png" alt="">Passkey Vault</a></div>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="../"><img src="../icon.png" alt="">Passkey Vault</a>
+      <nav class="nav" aria-label="Main">
+        <a href="../privacy/">Privacy</a>
+        <a href="../terms/">Terms</a>
+        <a href="https://github.com/aman-dhakar-191/passkey-provider-android">Source code</a>
+      </nav>
+    </div>
   </header>
-  <main class="wrap">
+  <main>
     <article class="doc">
       {{CONTENT}}
       <p class="updated">Last changed {{UPDATED}}. <a href="{{HISTORY}}">See every past version</a>.</p>
@@ -20,7 +27,12 @@
   </main>
   <footer>
     <div class="wrap">
-      <span><a href="../">Home</a> · <a href="../privacy/">Privacy policy</a> · <a href="../terms/">Terms of use</a> · <a href="https://github.com/aman-dhakar-191/passkey-provider-android">Source code</a></span>
+      <nav aria-label="Footer">
+        <a href="../">Home</a>
+        <a href="../privacy/">Privacy policy</a>
+        <a href="../terms/">Terms of use</a>
+        <a href="mailto:amandhaker191@gmail.com">Contact support</a>
+      </nav>
     </div>
   </footer>
 </body>
