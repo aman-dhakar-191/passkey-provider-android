@@ -110,7 +110,9 @@ def act(nodes):
     on_hybrid_screen = any("another device" in label(n).lower() for n in nodes)
     # On our own home screen, wait: its texts (app name, passkey names) match the patterns below, and any tap
     # there while Android's sheet is opening cancels the sheet.
-    if any(label(n) == "Scan QR code" for n in nodes):
+    # The button can be missing while the screen is still drawing, so also check the status line and heading.
+    if any(label(n) == "Scan QR code" or label(n).startswith("Passkey Vault is ") or label(n).startswith("Passkeys (")
+           for n in nodes):
         return None
     for pattern in TARGETS:
         if on_hybrid_screen and pattern is not PROVIDER:
