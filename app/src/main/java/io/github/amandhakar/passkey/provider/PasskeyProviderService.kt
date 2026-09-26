@@ -34,7 +34,9 @@ import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.webauthn.AssertionOptions
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import org.json.JSONObject
+import java.security.SecureRandom
 import java.time.Instant
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -87,11 +89,14 @@ class PasskeyProviderService : CredentialProviderService() {
         cancellationSignal: CancellationSignal,
         callback: OutcomeReceiver<BeginGetCredentialResponse, GetCredentialException>,
     ) {
-        try {
-            beginGet(request, callback)
-        } catch (e: Throwable) {
-            ProviderErrors.problem(this, "Sign-in offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
-            callback.onError(GetCredentialUnknownException(e.message ?: e.javaClass.simpleName))
+        // Checking the caller can mean fetching a site's assetlinks.json, so it must not run on the main thread.
+        background.execute {
+            try {
+                beginGet(request, callback)
+            } catch (e: Throwable) {
+                ProviderErrors.problem(this, "Sign-in offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
+                callback.onError(GetCredentialUnknownException(e.javaClass.simpleName))
+            }
         }
     }
 
@@ -101,11 +106,26 @@ class PasskeyProviderService : CredentialProviderService() {
     ) {
         val store = PasskeyStore.get(this)
         val entries = mutableListOf<CredentialEntry>()
+        val info = request.callingAppInfo
+        val caller = info?.packageName ?: "unknown caller"
+        val verifier = CallerVerifier(this)
         for (option in request.beginGetCredentialOptions) {
             if (option !is BeginGetPublicKeyCredentialOption) continue
             val options = runCatching { AssertionOptions.parse(option.requestJson) }.getOrNull() ?: continue
             // rpId is optional in WebAuthn sign-in requests; it then defaults to the page's own host.
-            val rpId = options.rpId ?: request.callingAppInfo?.let { originHost(it) }
+            val rpId = options.rpId ?: info?.let { originHost(it) }
+            // Only list passkeys to a caller that may use them: a trusted browser on that site, or an app the site
+            // vouches for. Otherwise another app could make the sheet show the user's accounts for any site.
+            // GetPasskeyActivity checks again before signing.
+            val refused = when {
+                info == null || rpId == null -> "caller or site unknown"
+                else -> runCatching { verifier.verifyRpId(info, verifier.resolveOrigin(info), rpId) }
+                    .exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }
+            }
+            if (refused != null) {
+                ProviderErrors.problem(this, "Sign-in asked by $caller for ${LogText.site(rpId)}: refused ($refused)")
+                continue
+            }
             val allowed = options.allowCredentialIds.map { Base64Url.encode(it) }.toSet()
             val matching = if (rpId == null) emptyList() else store.forRp(rpId)
                 .filter { allowed.isEmpty() || it.credentialId in allowed }
@@ -115,8 +135,8 @@ class PasskeyProviderService : CredentialProviderService() {
             } else {
                 "${store.all().size} passkey(s) saved in total"
             }
-            val message = "Sign-in asked by ${request.callingAppInfo?.packageName ?: "unknown caller"} for " +
-                "${rpId ?: "unknown site"}${if (options.rpId == null) " (site taken from the page)" else ""}: " +
+            val message = "Sign-in asked by $caller for " +
+                "${LogText.site(rpId)}${if (options.rpId == null) " (site taken from the page)" else ""}: " +
                 "${matching.size} passkey(s) offered, ${allowed.size} allowed by the site, $saved"
             // Nothing to offer looks like a failure to the user, so it is kept even in store builds.
             if (matching.isEmpty()) ProviderErrors.problem(this, message) else ProviderErrors.note(this, message)
@@ -186,6 +206,8 @@ class PasskeyProviderService : CredentialProviderService() {
 
     companion object {
         const val EXTRA_CREDENTIAL_ID = "io.github.amandhakar.passkey.CREDENTIAL_ID"
-        private val requestCodes = AtomicInteger()
+        // Random start: codes from before a process restart can't line up with new ones.
+        private val requestCodes = AtomicInteger(SecureRandom().nextInt())
+        private val background = Executors.newSingleThreadExecutor()
     }
 }

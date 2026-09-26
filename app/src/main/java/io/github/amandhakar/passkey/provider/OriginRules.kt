@@ -22,9 +22,9 @@ object OriginRules {
      * Browsers additionally reject public suffixes (e.g. "github.io") before the request reaches us.
      */
     fun browserOriginError(origin: String, rpId: String): String? {
-        if (!isValidDomain(rpId)) return "Invalid RP ID: $rpId"
-        val uri = runCatching { URI(origin) }.getOrNull() ?: return "Invalid origin: $origin"
-        val host = uri.host?.lowercase() ?: return "Invalid origin: $origin"
+        if (!isValidDomain(rpId)) return "Invalid RP ID"
+        val uri = runCatching { URI(origin) }.getOrNull() ?: return "Invalid origin"
+        val host = uri.host?.lowercase() ?: return "Invalid origin"
         val secure = uri.scheme == "https" || (uri.scheme == "http" && host == "localhost")
         if (!secure) return "Passkeys need a secure origin, got $origin"
         if (host != rpId && !host.endsWith(".$rpId")) return "$origin may not use passkeys for $rpId"
