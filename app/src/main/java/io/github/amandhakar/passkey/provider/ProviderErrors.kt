@@ -20,6 +20,7 @@ import java.util.Date
  */
 object ProviderErrors {
     private const val MAX_ENTRIES = 30
+    private const val MAX_ENTRY = 4000
     private const val SEPARATOR = "\n----------\n"
     // Store builds keep only problems (see RequestLog); GitHub and test builds keep every step.
     private val requests = RequestLog(logEverything = BuildConfig.LOG_ALL_REQUESTS || BuildConfig.SELF_TEST)
@@ -33,8 +34,8 @@ object ProviderErrors {
     }
 
     fun record(context: Context, operation: String, error: Throwable) {
-        Toast.makeText(context, "$operation failed: ${error.message ?: error.javaClass.simpleName}", Toast.LENGTH_LONG)
-            .show()
+        // The message can contain text from the calling app, so it only goes to the log, not the toast.
+        Toast.makeText(context, "$operation failed. Details are in the activity log.", Toast.LENGTH_LONG).show()
         append(
             context,
             requests.problem(
@@ -62,7 +63,9 @@ object ProviderErrors {
     private fun append(context: Context, message: String) {
         // The emulator test reads the log from logcat when the build is not debuggable ("minified").
         if (BuildConfig.SELF_TEST) Log.i("PasskeyVault", message)
-        val entry = "${DateFormat.getTimeInstance().format(Date())} $message"
+        // Caller text must not be able to fake entry boundaries or flood the log.
+        val safe = message.replace(SEPARATOR, "\n- - -\n").let { if (it.length > MAX_ENTRY) it.take(MAX_ENTRY) + "…" else it }
+        val entry = "${DateFormat.getTimeInstance().format(Date())} $safe"
         val previous = runCatching { file(context).readText() }.getOrDefault("")
             .split(SEPARATOR).filter { it.isNotBlank() }
         val text = (listOf(entry) + previous).take(MAX_ENTRIES).joinToString(SEPARATOR)

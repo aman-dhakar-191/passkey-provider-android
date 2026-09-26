@@ -126,9 +126,11 @@ class MainActivity : FragmentActivity() {
                     return@addOnSuccessListener
                 }
                 val uri = Uri.parse(raw)
+                // The code holds the secret for the desktop sign-in, so it goes only to Google Play services
+                // (which runs that sign-in), never to another app that also claims FIDO links.
                 val launched = listOf(uri, uri.normalizeScheme()).any {
                     try {
-                        startActivity(Intent(Intent.ACTION_VIEW, it))
+                        startActivity(Intent(Intent.ACTION_VIEW, it).setPackage(PLAY_SERVICES))
                         true
                     } catch (_: ActivityNotFoundException) {
                         false
@@ -192,6 +194,7 @@ class MainActivity : FragmentActivity() {
 }
 
 private const val EXTRA_RUN_SELF_TEST = "run_self_test"
+private const val PLAY_SERVICES = "com.google.android.gms"
 
 sealed interface UpdateState {
     data object Idle : UpdateState
