@@ -8,6 +8,7 @@ paragraphs, "- " lists with indented continuation lines, **bold**, _italic_, `co
 bare links.
 """
 import datetime
+import hashlib
 import html
 import re
 import shutil
@@ -92,6 +93,11 @@ def main():
                 .replace("{{HISTORY}}", f"{REPO}/commits/main/{source}"))
         (OUT / slug).mkdir()
         (OUT / slug / "index.html").write_text(page)
+
+    # Browsers keep style.css for a while; a new name per version stops new pages loading an old stylesheet.
+    version = hashlib.sha256((OUT / "style.css").read_bytes()).hexdigest()[:10]
+    for page in OUT.rglob("*.html"):
+        page.write_text(page.read_text().replace('style.css"', f'style.css?v={version}"'))
 
     for page in OUT.rglob("*.html"):
         if "{{" in page.read_text():
