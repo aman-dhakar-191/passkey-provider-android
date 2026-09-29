@@ -106,6 +106,12 @@ store APK/AAB contains the install-packages or notification permission, the upda
 package installer, WorkManager or the GitHub API. To prove the check itself works, it also checks
 that the same things *are* found in the GitHub build.
 
+**Uploading to Indus Appstore from GitHub:** tick *Upload to Indus Appstore* when running *Store release*
+and it sends the store APK to Indus as an update, with your release notes. One-time setup: create an API
+token in the Indus developer console (*Tools & Resources*) and add it as the `INDUS_APP_STORE_API_TOKEN`
+secret. The upload runs in the `indus-appstore` environment, where you can require your own approval
+before it runs (*Settings → Environments*). Indus still reviews each update.
+
 Store listing text, Data-safety answers and signing notes are in
 [docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md) and the terms of use are [TERMS.md](TERMS.md).
 
