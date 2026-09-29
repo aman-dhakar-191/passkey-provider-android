@@ -6,12 +6,23 @@ name: Store release
 #   - passkey-vault-<version>.apk  for Indus Appstore / other stores that take APKs
 # Both are signed with the same key as the GitHub releases (the KEYSTORE_* secrets). The files are kept
 # as a download for 30 days; upload them in the store's developer console. See README.md.
+# With "Upload to Indus Appstore" ticked, the APK is also sent to Indus as an update (the app must
+# already be published there once). That upload runs in its own job, so the Indus token never shares
+# a machine with the build.
 on:
   workflow_dispatch:
     inputs:
       version:
         description: "Released version to build, e.g. 1.2.0 (empty = latest release)"
         required: false
+      upload_to_indus:
+        description: "Upload the APK to Indus Appstore as an update (needs the INDUS_APP_STORE_API_TOKEN secret)"
+        type: boolean
+        default: false
+      release_notes:
+        description: "What's new, shown on Indus (plain text)"
+        required: false
+        default: "Bug fixes and improvements."
 
 permissions:
   contents: read
@@ -20,6 +31,8 @@ jobs:
   store:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Resolve version
         id: version
@@ -119,3 +132,44 @@ jobs:
           path: out/
           retention-days: 30
           if-no-files-found: error
+
+  indus:
+    # Same upload as indusappstore/appstore-release (PhonePe/Indus-Flows), done directly: one HTTPS
+    # request, without running third-party scripts that get the token.
+    if: inputs.upload_to_indus
+    needs: store
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: indus-appstore
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: store-v${{ needs.store.outputs.version }}
+          path: out
+
+      - name: Upload APK to Indus Appstore
+        env:
+          INDUS_TOKEN: ${{ secrets.INDUS_APP_STORE_API_TOKEN }}
+          VERSION: ${{ needs.store.outputs.version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          PACKAGE: io.github.amandhakar.passkey
+        run: |
+          if [ -z "$INDUS_TOKEN" ]; then
+            echo "::error::INDUS_APP_STORE_API_TOKEN secret is missing. Create a token in the Indus developer console (Tools & Resources) and add it as a secret."
+            exit 1
+          fi
+          APK="out/passkey-vault-$VERSION.apk"
+          (cd out && sha256sum -c SHA256SUMS.txt --ignore-missing)
+          STATUS=$(curl -sS --retry 2 --max-time 600 -o response.txt -w '%{http_code}' \
+            -H "Authorization: O-Bearer $INDUS_TOKEN" \
+            -F "file=@$APK" \
+            --form-string "releaseNotes=$RELEASE_NOTES" \
+            "https://developer-api.indusappstore.com/devtools/apk/upgrade/$PACKAGE")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "## Indus Appstore: v$VERSION uploaded" >> "$GITHUB_STEP_SUMMARY"
+            echo "Check its review status in the Indus developer console." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Indus Appstore upload failed (HTTP $STATUS)"
+            head -c 2000 response.txt; echo
+            exit 1
+          fi
