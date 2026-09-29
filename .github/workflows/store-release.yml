@@ -158,6 +158,8 @@ jobs:
             echo "::error::INDUS_APP_STORE_API_TOKEN secret is missing. Create a token in the Indus developer console (Tools & Resources) and add it as a secret."
             exit 1
           fi
+          # A token pasted with a space or line break is rejected as HTTP 401.
+          INDUS_TOKEN=$(printf '%s' "$INDUS_TOKEN" | tr -d '[:space:]')
           APK="out/passkey-vault-$VERSION.apk"
           (cd out && sha256sum -c SHA256SUMS.txt --ignore-missing)
           STATUS=$(curl -sS --retry 2 --max-time 600 -o response.txt -w '%{http_code}' \
@@ -169,7 +171,10 @@ jobs:
             echo "## Indus Appstore: v$VERSION uploaded" >> "$GITHUB_STEP_SUMMARY"
             echo "Check its review status in the Indus developer console." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "::error::Indus Appstore upload failed (HTTP $STATUS)"
+            case "$STATUS" in
+              401|403) echo "::error::Indus Appstore rejected the API token (HTTP $STATUS). Create a new token in the Indus developer console (Tools & Resources) and paste it into the INDUS_APP_STORE_API_TOKEN secret. The app must also be live on Indus already." ;;
+              *) echo "::error::Indus Appstore upload failed (HTTP $STATUS)" ;;
+            esac
             head -c 2000 response.txt; echo
             exit 1
           fi
