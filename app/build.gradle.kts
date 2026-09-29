@@ -132,6 +132,7 @@ dependencies {
     // Device-setup transfer beta (src/github/.../devicesetup); not in store builds.
     "githubImplementation"(libs.androidx.credentials.providerevents)
     "githubImplementation"(libs.androidx.credentials.providerevents.play.services)
+    "githubImplementation"(libs.androidx.core.providerevents) // OutcomeReceiverCompat in its API
     implementation(libs.play.services.code.scanner)
     implementation(libs.kotlinx.coroutines.android)
 
