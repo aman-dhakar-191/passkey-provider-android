@@ -1,9 +1,11 @@
 package io.github.amandhakar.passkey.crypto
 
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import io.github.amandhakar.passkey.webauthn.Base64Url
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -67,6 +69,28 @@ object PasskeyKeys {
 
     /** The public key, for checking signatures (the self-test uses it to verify a sign-in). */
     fun publicKey(credentialId: ByteArray): PublicKey? = keyStore().getCertificate(alias(credentialId))?.publicKey
+
+    /** Where a passkey's private key is kept, as the Keystore reports it (see [storage]). */
+    data class Storage(val securityLevel: String, val userAuthRequired: Boolean, val exportable: Boolean)
+
+    /**
+     * Diagnostics only (the device-setup beta): reads the key's metadata from the Keystore. The key is not
+     * used, so no user authentication is needed, and its private bytes are never read: [PrivateKey.getEncoded]
+     * is how Java would export a key, and the Android Keystore always answers null. Returns null if the key
+     * is missing.
+     */
+    fun storage(credentialId: ByteArray): Storage? {
+        val key = keyStore().getKey(alias(credentialId), null) as? PrivateKey ?: return null
+        val info = KeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE).getKeySpec(key, KeyInfo::class.java)
+        val level = when (info.securityLevel) {
+            KeyProperties.SECURITY_LEVEL_STRONGBOX -> "StrongBox"
+            KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TEE"
+            KeyProperties.SECURITY_LEVEL_SOFTWARE -> "software"
+            KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE -> "secure hardware (unknown kind)"
+            else -> "unknown"
+        }
+        return Storage(level, info.isUserAuthenticationRequired, exportable = key.encoded != null)
+    }
 
     fun delete(credentialId: ByteArray) {
         keyStore().deleteEntry(alias(credentialId))

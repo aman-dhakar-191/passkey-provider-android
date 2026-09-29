@@ -112,6 +112,10 @@ token in the Indus developer console (*Tools & Resources*) and add it as the `IN
 secret. The upload runs in the `indus-appstore` environment, where you can require your own approval
 before it runs (*Settings → Environments*). Indus still reviews each update.
 
+**Device-setup transfer (beta, GitHub builds only):** an experimental `DeviceSetupService` that logs what
+Android asks for and delivers when a new phone is set up from an old one. Passkeys never leave the phone,
+because their keys are hardware-bound. See [docs/device-setup-beta.md](docs/device-setup-beta.md).
+
 Store listing text, Data-safety answers and signing notes are in
 [docs/store-listing.md](docs/store-listing.md). The privacy policy is [PRIVACY.md](PRIVACY.md) and the terms of use are [TERMS.md](TERMS.md).
 
