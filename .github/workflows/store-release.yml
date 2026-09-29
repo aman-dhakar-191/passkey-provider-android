@@ -158,8 +158,11 @@ jobs:
             echo "::error::INDUS_APP_STORE_API_TOKEN secret is missing. Create a token in the Indus developer console (Tools & Resources) and add it as a secret."
             exit 1
           fi
-          # A token pasted with a space or line break is rejected as HTTP 401.
+          # The console's copy button copies the whole header ("Authorization: O-Bearer <token>"), and a
+          # token pasted with a space or line break is rejected as HTTP 401. Keep only the token itself.
           INDUS_TOKEN=$(printf '%s' "$INDUS_TOKEN" | tr -d '[:space:]')
+          INDUS_TOKEN="${INDUS_TOKEN#Authorization:}"
+          INDUS_TOKEN="${INDUS_TOKEN#O-Bearer}"
           APK="out/passkey-vault-$VERSION.apk"
           (cd out && sha256sum -c SHA256SUMS.txt --ignore-missing)
           STATUS=$(curl -sS --retry 2 --max-time 600 -o response.txt -w '%{http_code}' \
