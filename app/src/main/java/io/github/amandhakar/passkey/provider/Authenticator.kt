@@ -10,6 +10,7 @@ import io.github.amandhakar.passkey.webauthn.CreationOptions
 import io.github.amandhakar.passkey.webauthn.WebAuthnEncoding
 import io.github.amandhakar.passkey.webauthn.WebAuthnJson
 import java.security.SecureRandom
+import java.security.Signature
 
 /**
  * The WebAuthn authenticator. Callers must have verified the caller/RP ID and the user before calling.
@@ -60,7 +61,14 @@ class Authenticator(context: Context) {
         )
     }
 
-    fun authenticate(passkey: Passkey, options: AssertionOptions, origin: String, clientDataHash: ByteArray?): String {
+    /** Signs with [signer], which a user-verification prompt must already have unlocked (see PasskeyKeys.signer). */
+    fun authenticate(
+        passkey: Passkey,
+        options: AssertionOptions,
+        origin: String,
+        clientDataHash: ByteArray?,
+        signer: Signature,
+    ): String {
         val credentialId = Base64Url.decode(passkey.credentialId)
         val authData = WebAuthnEncoding.authenticatorData(
             rpId = passkey.rpId,
@@ -70,7 +78,7 @@ class Authenticator(context: Context) {
         )
         val clientData = WebAuthnEncoding.clientDataJson("webauthn.get", options.challenge, origin)
         val hash = clientDataHash ?: WebAuthnEncoding.sha256(clientData)
-        val signature = PasskeyKeys.sign(credentialId, authData + hash)
+        val signature = PasskeyKeys.sign(signer, authData + hash)
         store.markUsed(passkey.credentialId, System.currentTimeMillis())
         return WebAuthnJson.authenticationResponse(
             credentialId = credentialId,

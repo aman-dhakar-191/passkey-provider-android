@@ -2,7 +2,6 @@ package io.github.amandhakar.passkey.provider
 
 import android.content.Intent
 import android.os.Bundle
-import android.security.keystore.UserNotAuthenticatedException
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
@@ -12,8 +11,12 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.webauthn.AssertionOptions
+import io.github.amandhakar.passkey.webauthn.Base64Url
+import java.security.Signature
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,22 +75,38 @@ class GetPasskeyActivity : FragmentActivity() {
         }
 
         val authenticator = Authenticator(this)
-        suspend fun sign() = withContext(Dispatchers.Default) {
-            authenticator.authenticate(passkey, options, origin, option.clientDataHash)
+        val keyId = Base64Url.decode(passkey.credentialId)
+        val title = "Sign in with passkey"
+        val subtitle = "${passkey.userName} on ${passkey.rpId}"
+        suspend fun sign(signer: Signature) = withContext(Dispatchers.Default) {
+            authenticator.authenticate(passkey, options, origin, option.clientDataHash, signer)
         }
         suspend fun promptAndSign(): String {
-            if (!verifyUser("Sign in with passkey", "${passkey.userName} on ${passkey.rpId}")) {
-                throw GetCredentialCancellationException("User cancelled")
+            val timeBound = withContext(Dispatchers.Default) { PasskeyKeys.isTimeBound(keyId) }
+            val signer = if (timeBound) {
+                // Passkey from app 1.3.5 or older: its key works for 30 s after any authentication.
+                if (!verifyUser(title, subtitle)) throw GetCredentialCancellationException("User cancelled")
+                withContext(Dispatchers.Default) { PasskeyKeys.signer(keyId) }
+            } else {
+                // The prompt authorises this one signer; the Keystore refuses any other signature.
+                val signer = withContext(Dispatchers.Default) { PasskeyKeys.signer(keyId) }
+                verifyUserFor(signer, title, subtitle) ?: throw GetCredentialCancellationException("User cancelled")
             }
-            return sign()
+            return sign(signer)
         }
-        // Android 15+ may already have verified the user in its passkey sheet. If that did not unlock the
-        // key (e.g. a weaker biometric was used), the Keystore refuses and we fall back to our own prompt.
+        // Android 15+ may already have verified the user in its passkey sheet. For a current key that prompt
+        // authorised the signer kept in SheetSigners; for an older time-bound key it unlocked the key for 30 s.
+        // If neither works (process restarted, Keystore dropped the operation, weaker biometric), the Keystore
+        // refuses and we fall back to our own prompt.
+        val sheetSigner = SheetSigners.take(passkey.credentialId)
         val response = if (request.biometricPromptResult?.isSuccessful == true) {
             try {
-                sign().also { ProviderErrors.note(this, "User verified in Android's passkey sheet") }
-            } catch (e: UserNotAuthenticatedException) {
-                ProviderErrors.note(this, "Sheet verification did not unlock the key; asking again")
+                sign(sheetSigner ?: withContext(Dispatchers.Default) { PasskeyKeys.signer(keyId) })
+                    .also { ProviderErrors.note(this, "User verified in Android's passkey sheet") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ProviderErrors.note(this, "Sheet verification did not unlock the key (${e.javaClass.simpleName}); asking again")
                 promptAndSign()
             }
         } else {

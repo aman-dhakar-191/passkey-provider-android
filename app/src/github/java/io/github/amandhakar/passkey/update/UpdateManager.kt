@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.webauthn.AppVersion
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -21,6 +22,8 @@ import java.security.MessageDigest
  */
 object UpdateManager {
     private const val API = "https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest"
+    // A release's JSON is a few KB plus its notes; far below this.
+    private const val MAX_API_RESPONSE_BYTES = 1024 * 1024
 
     /** Blocking; call from a background thread. */
     fun latestRelease(): Release? {
@@ -119,10 +122,21 @@ object UpdateManager {
         return conn
     }
 
+    /** GET with a size cap, so a broken or hostile response cannot exhaust memory. */
     private fun httpGet(url: String): String {
         val conn = open(url)
         try {
-            return conn.inputStream.bufferedReader().use { it.readText() }
+            conn.inputStream.use { input ->
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(8192)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    if (out.size() > MAX_API_RESPONSE_BYTES) throw IOException("Response too large: $url")
+                }
+                return out.toString(Charsets.UTF_8.name())
+            }
         } finally {
             conn.disconnect()
         }
