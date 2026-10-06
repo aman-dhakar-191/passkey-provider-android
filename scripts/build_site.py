@@ -3,7 +3,8 @@
 
 site/ holds the landing page; the privacy and terms pages are generated from PRIVACY.md and TERMS.md, so
 there is one copy of each. "Last changed" dates come from git, so they can't go stale. Needs git history
-for those files (the workflow checks out with fetch-depth: 0). Only handles the Markdown those files use: headings,
+for those files (the workflow checks out with fetch-depth: 0). The privacy, terms and demo pages are generated from PRIVACY.md, TERMS.md and docs/DEMO.md.
+Only handles the Markdown those files use: headings,
 paragraphs, "- " lists with indented continuation lines, **bold**, _italic_, `code`, [links](url) and
 bare links.
 """
@@ -86,13 +87,23 @@ def main():
         "{{SITE_UPDATED}}", last_changed("site", "docs/store", "PRIVACY.md", "TERMS.md")))
 
     template = (ROOT / "site/page.template.html").read_text()
-    for source, slug, title in (("PRIVACY.md", "privacy", "Privacy policy"), ("TERMS.md", "terms", "Terms of use")):
+    for source, slug, title in (
+        ("PRIVACY.md", "privacy", "Privacy policy"),
+        ("TERMS.md", "terms", "Terms of use"),
+        ("docs/DEMO.md", "demo", "Demo app"),
+    ):
         page = (template.replace("{{TITLE}}", title)
                 .replace("{{CONTENT}}", markdown((ROOT / source).read_text()))
                 .replace("{{UPDATED}}", last_changed(source))
                 .replace("{{HISTORY}}", f"{REPO}/commits/main/{source}"))
         (OUT / slug).mkdir()
         (OUT / slug / "index.html").write_text(page)
+
+    # The demo app's login page, served for real: the same file the app shows in a WebView, with this site as
+    # its site. (There is no app on the other end, so it only shows what the browser got back.)
+    (OUT / "demo" / "login").mkdir()
+    login = (ROOT / "demo/src/main/assets/login.html").read_text().replace("__RP_ID__", "aman-dhakar-191.github.io")
+    (OUT / "demo" / "login" / "index.html").write_text(login)
 
     # Browsers keep style.css for a while; a new name per version stops new pages loading an old stylesheet.
     version = hashlib.sha256((OUT / "style.css").read_bytes()).hexdigest()[:10]
