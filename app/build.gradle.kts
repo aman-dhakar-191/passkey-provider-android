@@ -88,11 +88,14 @@ android {
             // Activity log: every step of every request (this is the channel used for debugging).
             buildConfigField("boolean", "LOG_ALL_REQUESTS", "true")
             buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+            buildConfigField("boolean", "BLOCK_SCREENSHOTS", "false")
         }
         create("store") {
             dimension = "distribution"
             // Activity log: only requests that went wrong, with the steps that led to it.
             buildConfigField("boolean", "LOG_ALL_REQUESTS", "false")
+            // No screenshots, screen recording or Recents preview of the app (it lists the user's sites).
+            buildConfigField("boolean", "BLOCK_SCREENSHOTS", "true")
         }
     }
 

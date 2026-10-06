@@ -104,6 +104,9 @@ The same code (one branch) builds two variants, as Gradle product flavors:
 | **GitHub** (sideload) | `github` | the app updates itself from GitHub Releases | *Actions → Release* |
 | **Google Play / Indus Appstore** | `store` | by the store; no self-updater, no install-packages permission | release on GitHub first, then *Actions → Store release* (builds that version as a signed `.aab` + `.apk`) |
 
+Store builds also block screenshots, screen recording and the Recents preview, because the app's
+screens list the sites you have passkeys for. GitHub builds allow them, for bug reports.
+
 The store variant doesn't just switch the updater off. The updater, its permissions and WorkManager
 live in `app/src/github/`, which the store build never compiles. The store build gets only a stub
 (`app/src/store/`). `scripts/check-store-build.sh` runs in CI and in *Store release*. It fails if the
