@@ -26,7 +26,7 @@ Each demo release includes that file, called `assetlinks.json`. The demo's **Che
 
 ## Try a login page in a browser
 
-This page works like the one inside the demo, but runs in your browser: [open the demo login page](login/). Passkeys made there are for the site aman-dhakar-191.github.io.
+This page works like the one inside the demo, but runs in your browser: [open the demo login page](https://aman-dhakar-191.github.io/passkey-provider-android/demo/login/). Passkeys made there are for the site aman-dhakar-191.github.io.
 
 ## Questions
 
