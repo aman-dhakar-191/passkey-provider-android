@@ -21,7 +21,7 @@ BUILD_TYPE = os.environ.get("BUILD_TYPE", "debug")
 APK = f"app/build/outputs/apk/github/{BUILD_TYPE}/app-github-{BUILD_TYPE}.apk"
 PIN = "1234"
 OUT = "emulator-output"
-TIMEOUT_S = 240
+TIMEOUT_S = 420  # create, sign in, then the duplicate and unverified-site refusals
 
 # Buttons to press, in priority order. Never press anything that cancels.
 PROVIDER = re.compile(r"^Passkey (Vault|Provider)$", re.I)
