@@ -177,7 +177,7 @@ class WebAuthnConformanceTest {
         )
         for (origin in hostile) {
             val parsed = JSONObject(String(WebAuthnEncoding.clientDataJson("webauthn.get", challenge, origin), Charsets.UTF_8))
-            assertEquals(setOf("type", "challenge", "origin", "crossOrigin"), parsed.keySet())
+            assertEquals(setOf("type", "challenge", "origin", "crossOrigin"), parsed.keys().asSequence().toSet())
             assertEquals(origin, parsed.getString("origin"))
             assertEquals("webauthn.get", parsed.getString("type"))
             assertFalse(parsed.getBoolean("crossOrigin"))
