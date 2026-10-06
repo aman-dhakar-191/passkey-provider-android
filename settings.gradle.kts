@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "PasskeyProvider"
 include(":app")
+include(":demo")

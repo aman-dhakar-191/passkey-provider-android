@@ -1,0 +1,131 @@
+package io.github.amandhakar.passkeydemo
+
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
+
+/**
+ * Updates the demo from this repository's GitHub Releases (tags demo-vX.Y.Z). Android itself only installs an
+ * update signed with the same key as the installed app; on top of that the download must match the checksum
+ * GitHub reports and be this package.
+ */
+object Updater {
+    private const val MAX_LIST_BYTES = 1024 * 1024
+    private const val MAX_APK_BYTES = 100L * 1024 * 1024
+    private val api = "https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases?per_page=30"
+
+    /** Blocking; call from a background thread. The newest demo release, or null if there is none. */
+    fun latestRelease(): Release? = Releases.latest(httpGetText(api), BuildConfig.UPDATE_REPO)
+
+    fun isNewer(release: Release) = AppVersion.isNewer(release.version, BuildConfig.VERSION_NAME)
+
+    fun canInstall(context: Context) = context.packageManager.canRequestPackageInstalls()
+
+    /** Blocking download into the cache dir. [onProgress] gets 0..1. */
+    fun download(context: Context, release: Release, onProgress: (Float) -> Unit): File {
+        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        val file = File(dir, "update-${release.version}.apk")
+        val digest = MessageDigest.getInstance("SHA-256")
+        val conn = open(release.apkUrl)
+        try {
+            val total = conn.contentLengthLong.takeIf { it > 0 } ?: release.apkSize
+            if (total > MAX_APK_BYTES) throw IOException("Update is unexpectedly large")
+            conn.inputStream.use { input ->
+                file.outputStream().use { out ->
+                    val buf = ByteArray(64 * 1024)
+                    var done = 0L
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)
+                        digest.update(buf, 0, n)
+                        done += n
+                        if (done > MAX_APK_BYTES) throw IOException("Update is unexpectedly large")
+                        if (total > 0) onProgress((done.toFloat() / total).coerceAtMost(1f))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            file.delete()
+            throw e
+        } finally {
+            conn.disconnect()
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        if (release.sha256 != null && !release.sha256.equals(actual, ignoreCase = true)) {
+            file.delete()
+            throw IOException("Downloaded update is corrupted (checksum mismatch)")
+        }
+        val info = context.packageManager.getPackageArchiveInfo(file.path, PackageManager.PackageInfoFlags.of(0))
+        if (info?.packageName != context.packageName) {
+            file.delete()
+            throw IOException("Downloaded file is not an update for this app")
+        }
+        return file
+    }
+
+    /** Hands the APK to the system installer. The result arrives in [InstallResultReceiver]. */
+    fun install(context: Context, apk: File) {
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setAppPackageName(context.packageName)
+            setSize(apk.length())
+            setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        }
+        val sessionId = installer.createSession(params)
+        installer.openSession(sessionId).use { session ->
+            session.openWrite("base.apk", 0, apk.length()).use { out ->
+                apk.inputStream().use { it.copyTo(out) }
+                session.fsync(out)
+            }
+            val callback = PendingIntent.getBroadcast(
+                context,
+                sessionId,
+                Intent(context, InstallResultReceiver::class.java).setPackage(context.packageName),
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            session.commit(callback.intentSender)
+        }
+    }
+
+    private fun open(url: String): HttpURLConnection {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 15_000
+        conn.readTimeout = 30_000
+        conn.setRequestProperty("User-Agent", "passkey-demo-android/${BuildConfig.VERSION_NAME}")
+        conn.setRequestProperty("Accept", "application/vnd.github+json, application/octet-stream")
+        if (conn.responseCode != 200) {
+            conn.disconnect()
+            throw IOException("HTTP ${conn.responseCode} from $url")
+        }
+        return conn
+    }
+
+    private fun httpGetText(url: String): String {
+        val conn = open(url)
+        try {
+            conn.inputStream.use { input ->
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(8192)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    if (out.size() > MAX_LIST_BYTES) throw IOException("Response too large: $url")
+                }
+                return out.toString(Charsets.UTF_8.name())
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+}

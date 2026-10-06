@@ -95,6 +95,31 @@ Debug builds use the package `io.github.amandhakar.passkey.debug` and have self-
 The version must be `MAJOR.MINOR.PATCH`, with each part between 0 and 99. The `versionCode` is
 derived from it, so it always goes up.
 
+## Demo app
+
+`demo/` is a small separate app, **Passkey Demo**, for trying passkeys the way other apps use them. Browsers
+are covered by the CI emulator test; apps are not, and some apps show their login page as a web page inside
+the app. The demo has both:
+
+- **Native:** create a passkey and sign in through Credential Manager, from the app's own screen.
+- **Web page inside the app:** a login page in a WebView (with WebAuthn switched on for it), or any URL.
+- It plays the website: every answer from the passkey provider is checked the way a real server must
+  (challenge, origin, site hash, user-verified flag, signature), and each check is listed as passed or failed.
+- **Check site setup** fetches the site's `/.well-known/assetlinks.json` and says what is missing.
+- **Updates:** *Check for updates* looks for newer demo releases on this repository's GitHub Releases and installs
+  them.
+
+**One-time setup: the demo needs a site that vouches for it.** Passkey Vault only lets an app use a site's passkeys
+if the site publishes `https://<site>/.well-known/assetlinks.json` naming the app and its signing certificate.
+The demo's site is set in `demo/build.gradle.kts` (`demoRpId`, default `aman-dhakar-191.github.io`, which needs a
+GitHub Pages *user* site, i.e. a repo named `aman-dhakar-191.github.io`, plus an empty `.nojekyll` file so the
+`.well-known` folder is published). Each demo release carries the exact `assetlinks.json` to publish.
+Run the workflow with another site in *rp_id* to use a different domain.
+
+**Releasing the demo:** *Actions → Demo release → Run workflow*. It signs with the same key as Passkey Vault,
+tags `demo-vX.Y.Z` and publishes a **pre-release**, deliberately: Passkey Vault's updater follows the
+repository's *latest* release, which GitHub never takes from a pre-release.
+
 ## Release channels
 
 The same code (one branch) builds two variants, as Gradle product flavors:

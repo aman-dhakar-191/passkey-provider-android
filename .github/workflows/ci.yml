@@ -38,8 +38,8 @@ jobs:
           curl -fsSL https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json \
             -o app/src/main/assets/privileged_browsers.json
 
-      - name: Unit tests, lint, and debug + (unsigned) release builds of both channels
-        run: ./gradlew --no-daemon testGithubDebugUnitTest lintGithubDebug lintStoreDebug assembleGithubDebug assembleGithubRelease assembleStoreRelease bundleStoreRelease
+      - name: Unit tests, lint, and debug + (unsigned) release builds of both channels and the demo app
+        run: ./gradlew --no-daemon testGithubDebugUnitTest lintGithubDebug lintStoreDebug assembleGithubDebug assembleGithubRelease assembleStoreRelease bundleStoreRelease :demo:testDebugUnitTest :demo:lintDebug :demo:assembleRelease
 
       - name: Store build contains no self-update code
         run: |
