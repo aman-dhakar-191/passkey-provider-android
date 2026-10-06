@@ -75,20 +75,22 @@ class CreatePasskeyActivity : FragmentActivity() {
         if (options.algorithms.isNotEmpty() && WebAuthnEncoding.COSE_ALG_ES256 !in options.algorithms) {
             throw CreatePublicKeyCredentialDomException(NotSupportedError(), "The site does not accept ES256 keys")
         }
-        val existing = PasskeyStore.get(this).forRp(rpId).map { it.credentialId }.toSet()
-        if (options.excludeCredentialIds.any { Base64Url.encode(it) in existing }) {
-            // WebAuthn: InvalidStateError tells the site this account is already registered on this device.
-            throw CreatePublicKeyCredentialDomException(
-                InvalidStateError(),
-                "You already have a passkey for this account on this device",
-            )
-        }
 
         // Android 15+ may already have verified the user in its passkey sheet; otherwise ask here.
         if (request.biometricPromptResult?.isSuccessful == true) {
             ProviderErrors.note(this, "User verified in Android's passkey sheet")
         } else if (!verifyUser("Create a passkey", "for ${options.userName.ifBlank { rpId }} on $rpId")) {
             throw CreateCredentialCancellationException("User cancelled")
+        }
+        val existing = PasskeyStore.get(this).forRp(rpId).map { it.credentialId }.toSet()
+        if (options.excludeCredentialIds.any { Base64Url.encode(it) in existing }) {
+            // WebAuthn: InvalidStateError tells the site this account is already registered on this device.
+            // Only after the user has verified (WebAuthn §6.3.2, step 3), so a site cannot silently find out
+            // whether this phone holds one of its passkeys.
+            throw CreatePublicKeyCredentialDomException(
+                InvalidStateError(),
+                "You already have a passkey for this account on this device",
+            )
         }
         val response = withContext(Dispatchers.Default) {
             Authenticator(this@CreatePasskeyActivity).register(options, rpId, origin)

@@ -36,9 +36,10 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
   give a passkey a name (✏️). The name only shows on this phone, including in Android's sign-in sheet.
 - On **Android 15 and newer** with a fingerprint (or other strong biometric) enrolled, the check
   happens inside Android's passkey sheet, so choosing a passkey and verifying is one step. The activity
-  log then says "User verified in Android's passkey sheet". On Android 14, the app shows its own prompt
-  after you choose. Either way it's strong biometrics or the device PIN/pattern/password; those are
-  what unlock the keys.
+  log then says "User verified in Android's passkey sheet". For signing in, the sheet accepts only the
+  fingerprint (Android's rule when the prompt unlocks a key); if it fails or you'd rather use the PIN,
+  the app shows its own prompt. On Android 14, the app always shows its own prompt after you choose.
+  Either way it's strong biometrics or the device PIN/pattern/password; those are what unlock the keys.
 
 **Security model:**
 - The WebAuthn operation starts only after the calling app has been verified:
@@ -46,8 +47,12 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
     refreshed daily.
   - A native app must be listed in the site's `/.well-known/assetlinks.json` with the
     `get_login_creds` relation.
-- Every create and sign-in needs biometrics or the device PIN/pattern/password. The Keystore
-  enforces this: a key only works for 30 seconds after the user authenticates.
+- Every create and sign-in needs biometrics or the device PIN/pattern/password. For sign-in the
+  Keystore enforces this too: each signature needs its own prompt, bound to that one signing
+  operation, so neither unlocking the phone nor an earlier sign-in lets a key sign again. Passkeys
+  made with version 1.3.5 or older keep their original rule (the key works for 30 seconds after you
+  authenticate); the app still asks every time, and making a new passkey for that site moves it to
+  the stricter rule.
 - Keys are **not backed up or synced**. If you lose the phone, you lose its passkeys, so keep
   another sign-in method on your important accounts.
 

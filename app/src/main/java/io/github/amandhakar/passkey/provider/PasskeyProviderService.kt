@@ -10,6 +10,7 @@ import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+import androidx.biometric.BiometricPrompt
 import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.CreateCredentialUnknownException
@@ -30,11 +31,14 @@ import androidx.credentials.provider.ProviderClearCredentialStateRequest
 import androidx.credentials.provider.PublicKeyCredentialEntry
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.R
+import io.github.amandhakar.passkey.crypto.PasskeyKeys
+import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.webauthn.AssertionOptions
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import org.json.JSONObject
 import java.security.SecureRandom
+import java.security.Signature
 import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -73,7 +77,7 @@ class PasskeyProviderService : CredentialProviderService() {
                 pendingIntent(CreatePasskeyActivity::class.java, null),
             ).setDescription(getString(R.string.create_entry_description))
                 .apply {
-                    if (Build.VERSION.SDK_INT >= 35) sheetBiometricPrompt()?.let { setBiometricPromptData(it) }
+                    if (Build.VERSION.SDK_INT >= 35) createSheetPrompt()?.let { setBiometricPromptData(it) }
                 }
                 .build()
             callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
@@ -109,6 +113,7 @@ class PasskeyProviderService : CredentialProviderService() {
         val info = request.callingAppInfo
         val caller = info?.packageName ?: "unknown caller"
         val verifier = CallerVerifier(this)
+        val sheetSigners = mutableMapOf<String, Signature>()
         for (option in request.beginGetCredentialOptions) {
             if (option !is BeginGetPublicKeyCredentialOption) continue
             val options = runCatching { AssertionOptions.parse(option.requestJson) }.getOrNull() ?: continue
@@ -151,31 +156,67 @@ class PasskeyProviderService : CredentialProviderService() {
                     )
                         .setDisplayName(passkey.label.ifBlank { passkey.displayName }.ifBlank { null })
                         .apply {
-                    if (Build.VERSION.SDK_INT >= 35) sheetBiometricPrompt()?.let { setBiometricPromptData(it) }
-                }
+                            if (Build.VERSION.SDK_INT >= 35) {
+                                signInSheetPrompt(passkey, sheetSigners)?.let { setBiometricPromptData(it) }
+                            }
+                        }
                         .setLastUsedTime(Instant.ofEpochMilli(passkey.lastUsedAt))
                         .build()
                 }
         }
+        SheetSigners.replaceAll(sheetSigners)
         callback.onResult(BeginGetCredentialResponse(credentialEntries = entries))
     }
 
     /**
      * Android 15+ can show the fingerprint / screen-lock prompt inside its own passkey sheet, so picking a
-     * passkey and verifying is one step. Strong biometrics or the device credential only: those are what
-     * unlock the passkey keys in the Keystore. On older Android the activity shows its own prompt.
+     * passkey and verifying is one step. Only with an enrolled strong biometric: without one the sheet has
+     * nothing to show and can get stuck (seen on an Android 16 emulator with only a PIN). Then the activity
+     * shows its own prompt.
      */
     @RequiresApi(35)
-    private fun sheetBiometricPrompt(): BiometricPromptData? {
-        if (!getSystemService(KeyguardManager::class.java).isDeviceSecure) return null
-        // Only with an enrolled strong biometric: without one the sheet has nothing to show and can get
-        // stuck (seen on an Android 16 emulator with only a PIN). Then the activity's own prompt is used.
-        if (BiometricManager.from(this).canAuthenticate(BIOMETRIC_STRONG) != BiometricManager.BIOMETRIC_SUCCESS) {
-            return null
-        }
+    private fun sheetPromptAvailable(): Boolean =
+        getSystemService(KeyguardManager::class.java).isDeviceSecure &&
+            BiometricManager.from(this).canAuthenticate(BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+
+    /** Creating a passkey uses no key, so the sheet's prompt only confirms the user (biometric or screen lock). */
+    @RequiresApi(35)
+    private fun createSheetPrompt(): BiometricPromptData? {
+        if (!sheetPromptAvailable()) return null
         return BiometricPromptData.Builder()
             .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
             .build()
+    }
+
+    /**
+     * For signing in, the sheet's prompt must unlock the Keystore operation that will sign, so it carries a
+     * signer as its CryptoObject (kept in [signers] for GetPasskeyActivity). Android then allows only a strong
+     * biometric in the sheet; someone who prefers the PIN, or whose fingerprint fails, gets the activity's
+     * prompt instead. Older time-bound keys (app 1.3.5 and before) keep the plain prompt, which unlocks them
+     * for 30 s. Returns null when the activity should prompt instead.
+     */
+    @RequiresApi(35)
+    private fun signInSheetPrompt(passkey: Passkey, signers: MutableMap<String, Signature>): BiometricPromptData? {
+        if (!sheetPromptAvailable()) return null
+        return try {
+            val keyId = Base64Url.decode(passkey.credentialId)
+            if (PasskeyKeys.isTimeBound(keyId)) {
+                BiometricPromptData.Builder().setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL).build()
+            } else if (signers.size < MAX_SHEET_SIGNERS) {
+                // Each signer holds an open Keystore operation, of which an app gets only a few.
+                val signer = PasskeyKeys.signer(keyId)
+                signers[passkey.credentialId] = signer
+                BiometricPromptData.Builder()
+                    .setCryptoObject(BiometricPrompt.CryptoObject(signer))
+                    .setAllowedAuthenticators(BIOMETRIC_STRONG)
+                    .build()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            ProviderErrors.problem(this, "Could not prepare the sheet prompt (${e.javaClass.simpleName}); the app will ask instead")
+            null
+        }
     }
 
     /** Host of a browser caller's page, or null for apps (their requests must name the rpId). */
@@ -209,5 +250,6 @@ class PasskeyProviderService : CredentialProviderService() {
         // Random start: codes from before a process restart can't line up with new ones.
         private val requestCodes = AtomicInteger(SecureRandom().nextInt())
         private val background = Executors.newSingleThreadExecutor()
+        private const val MAX_SHEET_SIGNERS = 4
     }
 }
