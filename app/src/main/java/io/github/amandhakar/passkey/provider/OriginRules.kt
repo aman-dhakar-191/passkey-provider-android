@@ -11,8 +11,14 @@ object OriginRules {
     private val DOMAIN = Regex("^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
     const val ASSET_LINKS_RELATION = "delegate_permission/common.get_login_creds"
 
-    /** A lowercase DNS name with at least two labels (or "localhost"). */
-    fun isValidDomain(value: String) = DOMAIN.matches(value) && (value.contains('.') || value == "localhost")
+    /**
+     * A lowercase DNS name with at least two labels (or "localhost"). The last label must not be all digits:
+     * no top-level domain is, so that rules out IP addresses (WebAuthn RP IDs are domains) and their
+     * numeric "parents" such as "0.1".
+     */
+    fun isValidDomain(value: String) = DOMAIN.matches(value) &&
+        (value.contains('.') || value == "localhost") &&
+        !value.substringAfterLast('.').all { it.isDigit() }
 
     fun hostOf(origin: String): String? = runCatching { URI(origin).host?.lowercase() }.getOrNull()
 
