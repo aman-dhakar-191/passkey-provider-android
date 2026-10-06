@@ -121,7 +121,9 @@ jobs:
           sha256sum "$APK" > "$APK.sha256"
 
           # The certificate fingerprint in the form assetlinks.json uses (uppercase hex pairs, colons).
-          HEX=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-signature.txt" | head -1)
+          # apksigner words this "Signer #1 certificate SHA-256 digest: ..." or, for a v3 signature,
+          # "V3.0 Signer: certificate SHA-256 digest: ...". Either way, the first certificate digest.
+          HEX=$(sed -n 's/^.*certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-signature.txt" | head -1)
           [[ "$HEX" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Could not read the signing certificate digest"; exit 1; }
           FP=$(echo "$HEX" | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F')
           cat > assetlinks.json <<JSON
