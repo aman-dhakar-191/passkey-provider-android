@@ -343,8 +343,8 @@ private fun DemoScreen(
         }
 
         Section("Web page inside the app (WebView)") {
-            Text("Like apps that show their login page as a web page. The built-in page uses this demo's site.", style = MaterialTheme.typography.bodySmall)
-            Button(onClick = { onOpenWeb(null) }) { Text("Open built-in login page") }
+            Text("Like apps that show their login page as a web page. The demo site's own login page is checked here; any other page just shows what the passkey app did.", style = MaterialTheme.typography.bodySmall)
+            Button(onClick = { onOpenWeb(null) }) { Text("Open the demo site's login page") }
             OutlinedTextField(webUrl, { webUrl = it }, label = { Text("Any other page") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onOpenWeb(webUrl) }) { Text("In a WebView") }

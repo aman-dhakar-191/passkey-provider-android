@@ -23,9 +23,11 @@ import org.json.JSONObject
  * if the app turns WebAuthn on for it; the request then reaches the passkey provider as coming from this
  * app, which the site must vouch for in assetlinks.json.
  *
- * With no URL the built-in page (assets/login.html) is shown as if served by the demo site, and what it
- * gets back from the passkey provider is checked here, like the native buttons do. With a URL, any page can
- * be tried; the provider's own activity log then tells what it did.
+ * With no URL the demo site's own login page is loaded for real from https://<site>/ (WebAuthn needs a page
+ * that really came over HTTPS, so a page faked from local HTML is refused by the WebView). What it gets back
+ * from the passkey provider is sent here and checked, like the native buttons do: only pages from the
+ * demo's own origin can reach that bridge. With a URL, any page can be tried; the provider's own activity
+ * log then tells what it did.
  */
 class WebLoginActivity : ComponentActivity() {
     private lateinit var status: TextView
@@ -69,20 +71,20 @@ class WebLoginActivity : ComponentActivity() {
             notes += "This WebView has no WebAuthn support, so passkeys cannot work in it."
         }
 
-        if (customUrl == null) {
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-                WebViewCompat.addWebMessageListener(web, "demoBridge", setOf("https://${BuildConfig.RP_ID}")) { _, message, _, _, _ ->
-                    handle(message.data)
-                }
-            } else {
-                notes += "No message bridge: results will only show inside the page."
+        // Only a page from the demo's own site can talk to this app; any other page gets no bridge.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(web, "demoBridge", setOf("https://${BuildConfig.RP_ID}")) { _, message, _, _, _ ->
+                handle(message.data)
             }
-            val page = assets.open("login.html").bufferedReader().use { it.readText() }.replace("__RP_ID__", BuildConfig.RP_ID)
-            web.loadDataWithBaseURL("https://${BuildConfig.RP_ID}/demo-login", page, "text/html", "utf-8", null)
-            notes += "Built-in page, shown as ${BuildConfig.RP_ID}."
         } else {
-            web.loadUrl(customUrl)
-            notes += "Loaded $customUrl. Open Passkey Vault's activity log to see what it did with the request."
+            notes += "No message bridge: results will only show inside the page."
+        }
+        val url = customUrl ?: "https://${BuildConfig.RP_ID}/"
+        web.loadUrl(url)
+        notes += if (customUrl == null) {
+            "Loaded the demo site's login page ($url)."
+        } else {
+            "Loaded $url. Open Passkey Vault's activity log to see what it did with the request."
         }
         status.text = notes.joinToString("\n")
     }
