@@ -109,12 +109,13 @@ the app. The demo has both:
 - **Updates:** *Check for updates* looks for newer demo releases on this repository's GitHub Releases and installs
   them.
 
-**One-time setup: the demo needs a site that vouches for it.** Passkey Vault only lets an app use a site's passkeys
-if the site publishes `https://<site>/.well-known/assetlinks.json` naming the app and its signing certificate.
-The demo's site is set in `demo/build.gradle.kts` (`demoRpId`, default `aman-dhakar-191.github.io`, which needs a
-GitHub Pages *user* site, i.e. a repo named `aman-dhakar-191.github.io`, plus an empty `.nojekyll` file so the
-`.well-known` folder is published). Each demo release carries the exact `assetlinks.json` to publish.
-Run the workflow with another site in *rp_id* to use a different domain.
+**The demo needs a site that vouches for it.** Passkey Vault only lets an app use a site's passkeys if the site
+publishes `https://<site>/.well-known/assetlinks.json` naming the app and its signing certificate. The demo's site is
+`aman-passkey-demo.web.app` (`demoRpId` in `demo/build.gradle.kts`), hosted on Firebase Hosting from the
+[demo-login](https://github.com/aman-dhakar-191/demo-login) repository, which also serves the demo's login page.
+GitHub Pages can't do this: a project site lives under `/<repo>/`, but the file must be at the root of the address.
+Each demo release carries the `assetlinks.json` for its signing key; if the key ever changes, update the copy in
+`demo-login` and redeploy. Run the *Demo release* workflow with *rp_id* to build the demo for another site.
 
 **Releasing the demo:** *Actions → Demo release → Run workflow*. It signs with the same key as Passkey Vault,
 tags `demo-vX.Y.Z` and publishes a **pre-release**, deliberately: Passkey Vault's updater follows the
