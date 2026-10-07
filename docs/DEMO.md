@@ -20,13 +20,13 @@ Most apps do not use passkeys in a browser. They ask Android directly, or they s
 
 ## Why a site is needed
 
-Passkey Vault only lets an app use a website's passkeys if the website says the app may. The website does that with a small file at https://aman-dhakar-191.github.io/.well-known/assetlinks.json that names the app and the key it is signed with. Without it, Passkey Vault refuses on purpose. That protects you from an app pretending to belong to a site.
+Passkey Vault only lets an app use a website's passkeys if the website says the app may. The website does that with a small file that names the app and the key it is signed with, at the root of the site's address. The demo's site is https://aman-passkey-demo.web.app and the file is at https://aman-passkey-demo.web.app/.well-known/assetlinks.json. Without it, Passkey Vault refuses on purpose. That protects you from an app pretending to belong to a site.
 
 Each demo release includes that file, called `assetlinks.json`. The demo's **Check site setup** button tells you whether the site is publishing it.
 
 ## Try a login page in a browser
 
-This page works like the one inside the demo, but runs in your browser: [open the demo login page](https://aman-dhakar-191.github.io/passkey-provider-android/demo/login/). Passkeys made there are for the site aman-dhakar-191.github.io.
+The demo's login page is a real web page on the demo's site: [open the demo login page](https://aman-passkey-demo.web.app/). In the demo app you can open the same address inside the app, which is how apps that show their login page as a web page behave. Passkeys made there are for the site aman-passkey-demo.web.app.
 
 ## Questions
 

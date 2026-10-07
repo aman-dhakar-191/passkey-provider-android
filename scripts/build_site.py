@@ -99,12 +99,6 @@ def main():
         (OUT / slug).mkdir()
         (OUT / slug / "index.html").write_text(page)
 
-    # The demo app's login page, served for real: the same file the app shows in a WebView, with this site as
-    # its site. (There is no app on the other end, so it only shows what the browser got back.)
-    (OUT / "demo" / "login").mkdir()
-    login = (ROOT / "demo/src/main/assets/login.html").read_text().replace("__RP_ID__", "aman-dhakar-191.github.io")
-    (OUT / "demo" / "login" / "index.html").write_text(login)
-
     # Browsers keep style.css for a while; a new name per version stops new pages loading an old stylesheet.
     version = hashlib.sha256((OUT / "style.css").read_bytes()).hexdigest()[:10]
     for page in OUT.rglob("*.html"):
