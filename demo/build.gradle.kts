@@ -14,7 +14,8 @@ val appVersionCode = appVersionName.substringBefore('-').split('.')
 
 // The site whose passkeys the demo uses. It must publish /.well-known/assetlinks.json naming this app, or the
 // passkey provider refuses (that is part of what the demo shows).
-val demoRpId = (findProperty("demoRpId") as String?) ?: "aman-dhakar-191.github.io"
+// It is hosted on Firebase Hosting from the demo-login repository, so the file sits at the root of its address.
+val demoRpId = (findProperty("demoRpId") as String?) ?: "aman-passkey-demo.web.app"
 val updateRepo = (findProperty("updateRepo") as String?) ?: "aman-dhakar-191/passkey-provider-android"
 
 // Release signing comes from the environment (GitHub Actions secrets), as for the main app.
