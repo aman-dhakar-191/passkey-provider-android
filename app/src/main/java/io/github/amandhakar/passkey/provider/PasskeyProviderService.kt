@@ -86,7 +86,9 @@ class PasskeyProviderService : CredentialProviderService() {
                 userName.ifBlank { getString(R.string.app_name) },
                 pendingIntent(CreatePasskeyActivity::class.java, null),
             ).setDescription(getString(R.string.create_entry_description))
-                .apply { sheetPrompt?.let { setBiometricPromptData(it) } }
+                .apply {
+                    if (Build.VERSION.SDK_INT >= 35) sheetPrompt?.let { setBiometricPromptData(it) }
+                }
                 .build()
             callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
             ProviderErrors.note(this, "Create offered to the system (fingerprint prompt in the sheet: ${sheetPrompt != null})")
