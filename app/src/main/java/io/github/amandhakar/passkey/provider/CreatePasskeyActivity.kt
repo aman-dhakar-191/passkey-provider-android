@@ -59,7 +59,7 @@ class CreatePasskeyActivity : FragmentActivity() {
             this,
             "Create started by ${request.callingAppInfo.packageName} " +
                 "(origin given: ${request.callingAppInfo.isOriginPopulated()}, " +
-                "client data hash: ${pkRequest.clientDataHash != null})\n" + requestSummary(pkRequest.requestJson),
+                "client data hash: ${pkRequest.clientDataHash != null})\n" + LogText.createRequestSummary(pkRequest.requestJson),
         )
         val options = CreationOptions.parse(pkRequest.requestJson)
         val verifier = CallerVerifier(this)
@@ -99,16 +99,4 @@ class CreatePasskeyActivity : FragmentActivity() {
         return response
     }
 
-    /** Only the request fields that affect whether a passkey can be made; no challenge or user id. */
-    private fun requestSummary(json: String): String = runCatching {
-        val o = JSONObject(json)
-        JSONObject()
-            .put("rp", o.optJSONObject("rp"))
-            .put("pubKeyCredParams", o.optJSONArray("pubKeyCredParams"))
-            .put("authenticatorSelection", o.optJSONObject("authenticatorSelection"))
-            .put("attestation", o.opt("attestation"))
-            .put("excludeCredentials", o.optJSONArray("excludeCredentials")?.length() ?: 0)
-            .put("extensions", o.optJSONObject("extensions"))
-            .toString()
-    }.getOrElse { "unparsable request: ${it.message}" }
 }
