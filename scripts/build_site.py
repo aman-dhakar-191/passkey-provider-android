@@ -3,7 +3,8 @@
 
 site/ holds the landing page; the privacy and terms pages are generated from PRIVACY.md and TERMS.md, so
 there is one copy of each. "Last changed" dates come from git, so they can't go stale. Needs git history
-for those files (the workflow checks out with fetch-depth: 0). Only handles the Markdown those files use: headings,
+for those files (the workflow checks out with fetch-depth: 0). The privacy, terms and demo pages are generated from PRIVACY.md, TERMS.md and docs/DEMO.md.
+Only handles the Markdown those files use: headings,
 paragraphs, "- " lists with indented continuation lines, **bold**, _italic_, `code`, [links](url) and
 bare links.
 """
@@ -86,7 +87,11 @@ def main():
         "{{SITE_UPDATED}}", last_changed("site", "docs/store", "PRIVACY.md", "TERMS.md")))
 
     template = (ROOT / "site/page.template.html").read_text()
-    for source, slug, title in (("PRIVACY.md", "privacy", "Privacy policy"), ("TERMS.md", "terms", "Terms of use")):
+    for source, slug, title in (
+        ("PRIVACY.md", "privacy", "Privacy policy"),
+        ("TERMS.md", "terms", "Terms of use"),
+        ("docs/DEMO.md", "demo", "Demo app"),
+    ):
         page = (template.replace("{{TITLE}}", title)
                 .replace("{{CONTENT}}", markdown((ROOT / source).read_text()))
                 .replace("{{UPDATED}}", last_changed(source))
