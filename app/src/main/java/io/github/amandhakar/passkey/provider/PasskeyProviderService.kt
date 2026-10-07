@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
+import android.os.Process
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -63,7 +65,16 @@ class PasskeyProviderService : CredentialProviderService() {
         cancellationSignal: CancellationSignal,
         callback: OutcomeReceiver<BeginCreateCredentialResponse, CreateCredentialException>,
     ) {
-        ProviderErrors.note(this, "Create asked by ${request.callingAppInfo?.packageName ?: "unknown caller"}")
+        // What the system sent decides whether it shows our entry, so record it (no challenge or user id).
+        val asker = request.callingAppInfo
+        val publicKeyRequest = request as? BeginCreatePublicKeyCredentialRequest
+        ProviderErrors.note(
+            this,
+            "Create asked by ${LogText.field(asker?.packageName ?: "unknown caller")} " +
+                "(origin given: ${asker?.isOriginPopulated()}, client data hash: ${publicKeyRequest?.clientDataHash != null}, " +
+                "Android ${Build.VERSION.SDK_INT}, app process age ${processAgeMs()} ms)" +
+                (publicKeyRequest?.let { "\n" + LogText.createRequestSummary(it.requestJson) } ?: ""),
+        )
         // An exception here is not a crash: Android drops it silently and just leaves this provider out.
         try {
             if (request !is BeginCreatePublicKeyCredentialRequest) {
@@ -72,16 +83,17 @@ class PasskeyProviderService : CredentialProviderService() {
             }
             val userName = runCatching { JSONObject(request.requestJson).getJSONObject("user").optString("name") }
                 .getOrNull().orEmpty()
+            val sheetPrompt = if (Build.VERSION.SDK_INT >= 35) createSheetPrompt() else null
             val entry = CreateEntry.Builder(
                 userName.ifBlank { getString(R.string.app_name) },
                 pendingIntent(CreatePasskeyActivity::class.java, null),
             ).setDescription(getString(R.string.create_entry_description))
                 .apply {
-                    if (Build.VERSION.SDK_INT >= 35) createSheetPrompt()?.let { setBiometricPromptData(it) }
+                    if (Build.VERSION.SDK_INT >= 35) sheetPrompt?.let { setBiometricPromptData(it) }
                 }
                 .build()
             callback.onResult(BeginCreateCredentialResponse(createEntries = listOf(entry)))
-            ProviderErrors.note(this, "Create offered to the system")
+            ProviderErrors.note(this, "Create offered to the system (fingerprint prompt in the sheet: ${sheetPrompt != null})")
         } catch (e: Throwable) {
             ProviderErrors.problem(this, "Create offer FAILED\n" + e.stackTraceToString().lineSequence().take(30).joinToString("\n"))
             callback.onError(CreateCredentialUnknownException(e.message ?: e.javaClass.simpleName))
@@ -244,6 +256,13 @@ class PasskeyProviderService : CredentialProviderService() {
             PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
     }
+
+    /**
+     * How long this app's process has been running. Android waits only a few seconds for a provider to
+     * answer and leaves it out of the sheet if it is slower; a process that is only milliseconds old when a
+     * request arrives was started by that request, which explains a missing entry.
+     */
+    private fun processAgeMs() = SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime()
 
     companion object {
         const val EXTRA_CREDENTIAL_ID = "io.github.amandhakar.passkey.CREDENTIAL_ID"
