@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
+import android.os.Process
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -70,7 +72,7 @@ class PasskeyProviderService : CredentialProviderService() {
             this,
             "Create asked by ${LogText.field(asker?.packageName ?: "unknown caller")} " +
                 "(origin given: ${asker?.isOriginPopulated()}, client data hash: ${publicKeyRequest?.clientDataHash != null}, " +
-                "Android ${Build.VERSION.SDK_INT})" +
+                "Android ${Build.VERSION.SDK_INT}, app process age ${processAgeMs()} ms)" +
                 (publicKeyRequest?.let { "\n" + LogText.createRequestSummary(it.requestJson) } ?: ""),
         )
         // An exception here is not a crash: Android drops it silently and just leaves this provider out.
@@ -254,6 +256,13 @@ class PasskeyProviderService : CredentialProviderService() {
             PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
     }
+
+    /**
+     * How long this app's process has been running. Android waits only a few seconds for a provider to
+     * answer and leaves it out of the sheet if it is slower; a process that is only milliseconds old when a
+     * request arrives was started by that request, which explains a missing entry.
+     */
+    private fun processAgeMs() = SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime()
 
     companion object {
         const val EXTRA_CREDENTIAL_ID = "io.github.amandhakar.passkey.CREDENTIAL_ID"
