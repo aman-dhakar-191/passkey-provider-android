@@ -36,7 +36,14 @@ class CreatePasskeyActivity : FragmentActivity() {
                     CreatePublicKeyCredentialResponse(createPasskey()),
                 )
             } catch (e: CreateCredentialException) {
-                if (e !is CreateCredentialCancellationException) ProviderErrors.record(this@CreatePasskeyActivity, "Creating passkey", e)
+                when {
+                    e is CreateCredentialCancellationException -> Unit
+                    // The site asked us not to create a duplicate and we correctly refused: not a failure, so no
+                    // "failed" toast and no FAILED entry in the log.
+                    e is CreatePublicKeyCredentialDomException && e.domError is InvalidStateError ->
+                        ProviderErrors.note(this@CreatePasskeyActivity, "Not created: this phone already has a passkey the site excluded (already registered)")
+                    else -> ProviderErrors.record(this@CreatePasskeyActivity, "Creating passkey", e)
+                }
                 PendingIntentHandler.setCreateCredentialException(result, e)
             } catch (e: Exception) {
                 ProviderErrors.record(this@CreatePasskeyActivity, "Creating passkey", e)
