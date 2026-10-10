@@ -55,6 +55,8 @@ dependencies {
     // QR codes: ZXing draws the receiver's code; Google's code scanner (as in Passkey Vault) reads it.
     implementation(libs.zxing.core)
     implementation(libs.play.services.code.scanner)
+    // The code scanner brings an old Fragment library; registerForActivityResult needs 1.3.0 or newer.
+    implementation(libs.androidx.fragment.ktx)
 
     testImplementation(libs.junit)
 }
