@@ -121,6 +121,16 @@ Each demo release carries the `assetlinks.json` for its signing key; if the key 
 tags `demo-vX.Y.Z` and publishes a **pre-release**, deliberately: Passkey Vault's updater follows the
 repository's *latest* release, which GitHub never takes from a pre-release.
 
+## Crypto Lab
+
+`cryptolab/` is a separate experiment app, **Crypto Lab**, for sending data to another phone over an encrypted
+channel: Wi-Fi or Bluetooth, paired by QR code or a 6-digit code. It is not used by Passkey Vault or the demo. See
+[cryptolab/README.md](cryptolab/README.md).
+
+**Releasing Crypto Lab:** *Actions → Crypto Lab release → Run workflow*. Like the demo, it signs with the same key,
+tags `cryptolab-vX.Y.Z` and publishes a **pre-release**, so neither Passkey Vault's updater nor the demo's ever
+picks it up. Crypto Lab doesn't update itself; install the newer APK over the old one.
+
 ## Release channels
 
 The same code (one branch) builds two variants, as Gradle product flavors:

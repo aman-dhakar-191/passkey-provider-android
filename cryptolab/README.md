@@ -6,7 +6,9 @@ final and working, it can be moved into the real apps.
 
 ## Trying it
 
-1. Get the APK from the **Crypto Lab** workflow (Actions → Crypto Lab → artifact `cryptolab-debug-apk`) and install it on two phones (Android 14+).
+1. Install the app on two phones (Android 14+):
+   - **Release:** open the [releases page](https://github.com/aman-dhakar-191/passkey-provider-android/releases), pick the newest **Crypto Lab** release (a pre-release, on purpose) and download `crypto-lab-X.Y.Z.apk`. To update, install a newer one over it.
+   - **Latest build:** the `cryptolab-debug-apk` artifact of the **Crypto Lab** workflow (Actions → Crypto Lab). A debug build can't be installed over a release, or the other way round; uninstall first.
 2. **Run self-test** on one phone. It runs every approach over loopback, plus the attacks below.
 3. Pick the same **Transport** on both phones:
    - **Wi-Fi or hotspot:** both phones on the same Wi-Fi, or one connected to the other's hotspot.
@@ -46,6 +48,12 @@ To add an approach:
 - **Transport:** anything that provides a `Connection` (an input and output stream) and a `Listener` works with the channel unchanged.
 
 Use vetted primitives only, never home-made ciphers. The lab compares how proven building blocks are put together.
+
+## Releasing
+
+*Actions → Crypto Lab release → Run workflow*, then pick patch, minor or major (the first release is 0.1.0). It
+runs the tests, builds the APK signed with the same key as Passkey Vault, and publishes it with its SHA-256 as
+a **pre-release** tagged `cryptolab-vX.Y.Z`.
 
 ## Tests
 
