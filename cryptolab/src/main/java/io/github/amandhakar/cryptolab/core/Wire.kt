@@ -19,6 +19,12 @@ interface Connection : Closeable {
     val peer: String
 }
 
+/** Waits for phones to connect. Each transport (TCP, Bluetooth, ...) provides one. */
+interface Listener : Closeable {
+    /** Blocks until a phone connects; [close] from another thread to stop waiting. */
+    fun accept(): Connection
+}
+
 /** Length-prefixed frames over a [Connection]. A frame larger than [maxFrame] is refused before it is read. */
 class Framer(connection: Connection, private val maxFrame: Int = DEFAULT_MAX_FRAME) {
     private val input = DataInputStream(connection.input)

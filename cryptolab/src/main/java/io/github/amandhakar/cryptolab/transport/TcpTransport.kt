@@ -1,9 +1,9 @@
 package io.github.amandhakar.cryptolab.transport
 
 import io.github.amandhakar.cryptolab.core.Connection
+import io.github.amandhakar.cryptolab.core.Listener
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -20,7 +20,7 @@ object TcpTransport {
     // Long enough for two people to compare the codes before the first encrypted record.
     private const val READ_TIMEOUT_MS = 5 * 60 * 1000
 
-    class Listener(port: Int = DEFAULT_PORT) : Closeable {
+    class TcpListener(port: Int = DEFAULT_PORT) : Listener {
         private val server = ServerSocket().apply {
             reuseAddress = true
             bind(InetSocketAddress(port))
@@ -28,8 +28,7 @@ object TcpTransport {
 
         val port: Int get() = server.localPort
 
-        /** Blocks until a phone connects; [close] from another thread to stop waiting. */
-        fun accept(): Connection = SocketConnection(server.accept())
+        override fun accept(): Connection = SocketConnection(server.accept())
 
         override fun close() = server.close()
     }

@@ -22,7 +22,7 @@ class ChannelTest {
     fun `self-test passes for every software suite`() {
         val lines = mutableListOf<SelfTest.Line>()
         SelfTest.run(Suites.software, payloadBytes = 256 * 1024) { lines += it }
-        assertEquals(Suites.software.size * 4, lines.size)
+        assertEquals(Suites.software.size * 5, lines.size)
         lines.forEach { assertTrue(it.text, it.ok) }
     }
 
@@ -61,6 +61,38 @@ class ChannelTest {
         assertEquals(listOf("item0", "item1", "item2"), results.map { it.name })
         i.close()
         r.close()
+    }
+
+    @Test
+    fun `QR invite round-trips and rejects other codes`() {
+        val secret = ByteArray(Handshake.QR_SECRET_SIZE) { it.toByte() }
+        val tcp = Invite.parse(Invite(Invite.TCP, listOf("192.168.1.9:47800", "10.0.0.2:47800"), secret).encode())
+        assertEquals(listOf("192.168.1.9:47800", "10.0.0.2:47800"), tcp.targets)
+        assertArrayEquals(secret, tcp.secret)
+        val bt = Invite.parse(Invite(Invite.BLUETOOTH, listOf("Aman's phone, 5G & more"), secret).encode())
+        assertEquals(Invite.BLUETOOTH, bt.transport)
+        assertEquals(listOf("Aman's phone, 5G & more"), bt.targets)
+        for (junk in listOf("FIDO:/123", "cryptolab:v1?t=tcp&a=x", "cryptolab:v1?t=ftp&a=x&k=" + "A".repeat(43))) {
+            try {
+                Invite.parse(junk)
+                fail("accepted $junk")
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+    }
+
+    @Test
+    fun `QR mode without a QR on the receiver is refused clearly`() {
+        val suite = Suites.software.first()
+        val (a, b) = SelfTest.loopbackPair()
+        val responder = background { runCatching { Handshake.respond(b, { suite }) } }
+        try {
+            Handshake.initiate(a, suite, ByteArray(Handshake.QR_SECRET_SIZE))
+            fail("expected ProtocolException")
+        } catch (e: ProtocolException) {
+            assertTrue(e.message!!.contains("QR"))
+        }
+        assertTrue(responder.get(30, TimeUnit.SECONDS).isFailure)
     }
 
     @Test

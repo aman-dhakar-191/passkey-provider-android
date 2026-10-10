@@ -29,6 +29,7 @@ object SelfTest {
             step(log, suite, "tampered record") { tamperedRecordIsRefused(suite) }
             step(log, suite, "replayed record") { replayedRecordIsRefused(suite) }
             step(log, suite, "man in the middle") { manInTheMiddleChangesCodes(suite) }
+            step(log, suite, "QR secret") { qrSecretAuthenticates(suite) }
         }
     }
 
@@ -43,7 +44,7 @@ object SelfTest {
 
     /** A connected pair of loopback TCP connections. */
     fun loopbackPair(): Pair<Connection, Connection> =
-        TcpTransport.Listener(port = 0).use { listener ->
+        TcpTransport.TcpListener(port = 0).use { listener ->
             val accepted = pool.submit(Callable { listener.accept() })
             val client = TcpTransport.connect("127.0.0.1", listener.port)
             client to accepted.get(TIMEOUT_S, TimeUnit.SECONDS)
@@ -117,6 +118,34 @@ object SelfTest {
         responderEnd.close()
         if (refusal is SecurityException) return "refused (${refusal.message})"
         throw IllegalStateException("not refused: ${refusal?.let { "${it.javaClass.simpleName}: ${it.message}" } ?: "accepted"}")
+    }
+
+    /**
+     * QR mode: with the same secret both sides confirm without comparing codes; with a different one (an old QR
+     * code, or an attacker who never saw it) the key confirmation fails on both sides.
+     */
+    private fun qrSecretAuthenticates(suite: CipherSuite): String {
+        fun attempt(senderSecret: ByteArray, receiverSecret: ByteArray): Pair<Throwable?, Throwable?> {
+            val (a, b) = loopbackPair()
+            val responder = pool.submit(Callable {
+                runCatching { Handshake.respond(b, { if (it == suite.id) suite else null }, receiverSecret).confirm(true) }
+            })
+            val initiator = runCatching { Handshake.initiate(a, suite, senderSecret).confirm(true) }
+            val responded = responder.get(TIMEOUT_S, TimeUnit.SECONDS)
+            initiator.getOrNull()?.close()
+            responded.getOrNull()?.close()
+            a.close()
+            b.close()
+            return initiator.exceptionOrNull() to responded.exceptionOrNull()
+        }
+        val random = SecureRandom()
+        val secret = ByteArray(Handshake.QR_SECRET_SIZE).also { random.nextBytes(it) }
+        val good = attempt(secret, secret)
+        check(good.first == null && good.second == null) { "matching secrets failed: ${good.first ?: good.second}" }
+        val other = ByteArray(Handshake.QR_SECRET_SIZE).also { random.nextBytes(it) }
+        val bad = attempt(secret, other)
+        check(bad.first != null && bad.second != null) { "a wrong secret was accepted" }
+        return "matching secret connects without a code; a wrong secret is refused on both sides"
     }
 
     private fun manInTheMiddleChangesCodes(suite: CipherSuite): String {

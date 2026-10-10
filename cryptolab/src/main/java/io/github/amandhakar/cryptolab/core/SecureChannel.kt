@@ -10,7 +10,7 @@ import java.security.SecureRandom
  * Handshake (protocol v1) between the phone that connects (initiator, "sender") and the one that listens
  * (responder, "receiver"):
  *
- *  1. I -> R  COMMIT  suite id, H("commit" || pkI || nI)
+ *  1. I -> R  COMMIT  suite id, auth mode, H("commit" || pkI || nI)
  *  2. R -> I  HELLO   status, suite id, pkR, nR
  *  3. I -> R  REVEAL  pkI, nI           (R checks it matches the commitment)
  *
@@ -24,6 +24,10 @@ import java.security.SecureRandom
  * (The same idea as Bluetooth numeric comparison and ZRTP.)
  *
  * Until both people confirm that the codes match, nothing but the confirmation is sent.
+ *
+ * QR mode: the receiver shows a QR code with its address and a one-time random secret; the sender scans
+ * it. Both mix the secret into the key derivation, so someone in the middle (who never saw the QR) ends up
+ * with different keys, and the automatic key confirmation fails. No code comparison is needed.
  */
 object Handshake {
     const val VERSION = 1
@@ -31,14 +35,29 @@ object Handshake {
     private const val NONCE_SIZE = 32
     private const val STATUS_OK = 0
     private const val STATUS_UNSUPPORTED = 1
+    private const val STATUS_NO_QR = 2
 
-    fun initiate(connection: Connection, suite: CipherSuite, random: SecureRandom = SecureRandom()): PendingChannel {
+    /** How the people authenticate the exchange: compare the 6-digit code, or a secret shared by QR code. */
+    private const val AUTH_CODE = 0
+    private const val AUTH_QR = 1
+
+    const val QR_SECRET_SIZE = 32
+
+    /** [qrSecret]: the secret from the receiver's QR code, or null to compare codes instead. */
+    fun initiate(
+        connection: Connection,
+        suite: CipherSuite,
+        qrSecret: ByteArray? = null,
+        random: SecureRandom = SecureRandom(),
+    ): PendingChannel {
+        require(qrSecret == null || qrSecret.size == QR_SECRET_SIZE) { "QR secret must be $QR_SECRET_SIZE bytes" }
         val framer = Framer(connection)
         val own = suite.kex.generate()
         try {
             val pk = suite.kex.encode(own.public)
             val nonce = ByteArray(NONCE_SIZE).also { random.nextBytes(it) }
-            val m1 = WireWriter().raw(MAGIC).u8(VERSION).string(suite.id).bytes(commitment(pk, nonce)).build()
+            val auth = if (qrSecret != null) AUTH_QR else AUTH_CODE
+            val m1 = WireWriter().raw(MAGIC).u8(VERSION).string(suite.id).u8(auth).bytes(commitment(pk, nonce)).build()
             framer.write(m1)
 
             val m2 = framer.read()
@@ -47,6 +66,7 @@ object Handshake {
             val status = r.u8()
             val suiteId = r.string()
             if (status == STATUS_UNSUPPORTED) throw ProtocolException("The other phone does not support ${suite.label}")
+            if (status == STATUS_NO_QR) throw ProtocolException("The other phone is not showing a QR code now; scan its current one")
             if (status != STATUS_OK || suiteId != suite.id) throw ProtocolException("Unexpected reply to the handshake")
             val peerPk = r.bytes()
             val peerNonce = r.bytes()
@@ -55,16 +75,21 @@ object Handshake {
 
             val m3 = WireWriter().bytes(pk).bytes(nonce).build()
             framer.write(m3)
-            return derive(Role.INITIATOR, framer, connection, suite, own, peerPk, m1, m2, m3)
+            return derive(Role.INITIATOR, framer, connection, suite, own, peerPk, qrSecret, m1, m2, m3)
         } finally {
             suite.kex.dispose(own)
         }
     }
 
-    /** [suiteFor] returns this phone's implementation of the suite id the initiator asked for, or null. */
+    /**
+     * [suiteFor] returns this phone's implementation of the suite id the initiator asked for, or null.
+     * [qrSecret] is the secret in the QR code this phone shows, if any. A sender that didn't scan it can still
+     * connect, but then the people must compare codes.
+     */
     fun respond(
         connection: Connection,
         suiteFor: (String) -> CipherSuite?,
+        qrSecret: ByteArray? = null,
         random: SecureRandom = SecureRandom(),
     ): PendingChannel {
         val framer = Framer(connection)
@@ -72,8 +97,14 @@ object Handshake {
         val r1 = WireReader(m1)
         readHeader(r1)
         val suiteId = r1.string()
+        val auth = r1.u8()
         val commit = r1.bytes()
         r1.end()
+        if (auth != AUTH_CODE && auth != AUTH_QR) throw ProtocolException("Unknown authentication mode $auth")
+        if (auth == AUTH_QR && qrSecret == null) {
+            framer.write(WireWriter().raw(MAGIC).u8(VERSION).u8(STATUS_NO_QR).string(suiteId).build())
+            throw ProtocolException("The other phone used a QR code, but this phone isn't showing one")
+        }
         val suite = suiteFor(suiteId)
         if (suite == null) {
             framer.write(WireWriter().raw(MAGIC).u8(VERSION).u8(STATUS_UNSUPPORTED).string(suiteId).build())
@@ -95,7 +126,7 @@ object Handshake {
             if (!MessageDigest.isEqual(commit, commitment(peerPk, peerNonce))) {
                 throw SecurityException("The other phone's key does not match its commitment")
             }
-            return derive(Role.RESPONDER, framer, connection, suite, own, peerPk, m1, m2, m3)
+            return derive(Role.RESPONDER, framer, connection, suite, own, peerPk, if (auth == AUTH_QR) qrSecret else null, m1, m2, m3)
         } finally {
             suite.kex.dispose(own)
         }
@@ -117,13 +148,15 @@ object Handshake {
         suite: CipherSuite,
         own: java.security.KeyPair,
         peerPkBytes: ByteArray,
+        qrSecret: ByteArray?,
         m1: ByteArray,
         m2: ByteArray,
         m3: ByteArray,
     ): PendingChannel {
         val shared = suite.kex.agree(own, suite.kex.decode(peerPkBytes))
         val transcript = sha256(WireWriter().raw(lengthPrefixed(m1)).raw(lengthPrefixed(m2)).raw(lengthPrefixed(m3)).build())
-        val prk = Hkdf.extract(transcript, shared)
+        // In QR mode the secret is part of the key material: without it, the keys come out different.
+        val prk = Hkdf.extract(transcript, if (qrSecret != null) shared + qrSecret else shared)
         val i2r = Hkdf.expand(prk, "cryptolab v1 key i2r".toByteArray(), suite.aead.keySize)
         val r2i = Hkdf.expand(prk, "cryptolab v1 key r2i".toByteArray(), suite.aead.keySize)
         val sasBytes = Hkdf.expand(prk, "cryptolab v1 sas".toByteArray(), 4)
@@ -141,6 +174,7 @@ object Handshake {
         return PendingChannel(
             sas = "%03d %03d".format(sas / 1000, sas % 1000),
             sessionId = transcript.copyOf(8).hex(),
+            usesQrSecret = qrSecret != null,
             channel = channel,
         )
     }
@@ -158,6 +192,8 @@ class PendingChannel internal constructor(
     val sas: String,
     /** Short id of this handshake, for the log (the same on both phones unless someone is in the middle). */
     val sessionId: String,
+    /** True when the QR code's secret authenticates the exchange: call [confirm] with true, no code to compare. */
+    val usesQrSecret: Boolean,
     private val channel: SecureChannel,
 ) : Closeable {
     val suite get() = channel.suite
@@ -169,7 +205,12 @@ class PendingChannel internal constructor(
             throw SecurityException("You said the codes did not match; connection closed")
         }
         channel.send(RecordType.CONFIRM, CONFIRM_PAYLOAD)
-        val reply = channel.receive()
+        val reply = try {
+            channel.receive()
+        } catch (e: SecurityException) {
+            if (!usesQrSecret) throw e
+            throw SecurityException("The QR secret does not match (an old QR code, or someone in the middle)", e)
+        }
         when {
             reply.type == RecordType.CONFIRM && reply.payload.contentEquals(CONFIRM_PAYLOAD) -> return channel
             reply.type == RecordType.CLOSE -> {

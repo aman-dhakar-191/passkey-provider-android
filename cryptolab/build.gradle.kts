@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
+    // QR codes: ZXing draws the receiver's code; Google's code scanner (as in Passkey Vault) reads it.
+    implementation(libs.zxing.core)
+    implementation(libs.play.services.code.scanner)
 
     testImplementation(libs.junit)
 }
