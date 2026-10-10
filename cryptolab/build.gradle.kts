@@ -7,6 +7,17 @@ plugins {
 // channel (see cryptolab/README.md). Separate from Passkey Vault and Passkey Demo; nothing here ships in them.
 // The protocol code (core/, transport/) has no Android imports, so its unit tests run on a plain JVM.
 
+// Released like the demo (see .github/workflows/cryptolab-release.yml): tags cryptolab-vX.Y.Z, always marked as
+// pre-releases so Passkey Vault's updater, which follows the repository's "latest" release, never sees them.
+val appVersionName = (findProperty("appVersionName") as String?)?.removePrefix("v") ?: "0.1.0"
+val appVersionCode = appVersionName.substringBefore('-').split('.')
+    .map { it.toIntOrNull() ?: 0 }
+    .let { it + List(3) { 0 } }
+    .let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
+
+// Release signing comes from the environment (GitHub Actions secrets), as for the other apps.
+val signingKeystore: String? = System.getenv("SIGNING_KEYSTORE_PATH")
+
 android {
     namespace = "io.github.amandhakar.cryptolab"
     compileSdk = 37
@@ -15,13 +26,27 @@ android {
         applicationId = "io.github.amandhakar.cryptolab"
         minSdk = 34
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+    }
+
+    signingConfigs {
+        if (signingKeystore != null) {
+            create("release") {
+                storeFile = file(signingKeystore)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = false // a test tool: nothing to hide, and no R8 surprises
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
