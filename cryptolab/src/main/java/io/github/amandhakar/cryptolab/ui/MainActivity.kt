@@ -57,6 +57,9 @@ import io.github.amandhakar.cryptolab.transport.TcpTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -77,8 +80,15 @@ class MainActivity : ComponentActivity() {
     private sealed interface Phase {
         data object Idle : Phase
         data class Busy(val what: String) : Phase
-        data class Listening(val addresses: List<String>, val port: Int) : Phase
+        /** [addresses]: (IP, network interface) pairs, the likely reachable ones first. */
+        data class Listening(val addresses: List<Pair<String, String>>, val port: Int) : Phase
         class Compare(val pending: PendingChannel, val answer: CompletableDeferred<Boolean>) : Phase
+
+        /** Receiver: a sender is connected; everything it sends is received until it disconnects. */
+        data class Receiving(val peer: String, val sas: String, val received: Int) : Phase
+
+        /** Sender: the code was confirmed; send as many items as you like over this one channel. */
+        class Connected(val peer: String, val sas: String, val suite: String, val outbox: Channel<Payload>) : Phase
     }
 
     /** Something to send: a name, its size and a way to read it. */
@@ -89,6 +99,7 @@ class MainActivity : ComponentActivity() {
     private val selected = mutableIntStateOf(0)
     private val phase = mutableStateOf<Phase>(Phase.Idle)
     private var job: Job? = null
+    private var listener: Closeable? = null
     private var openResource: Closeable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -128,6 +139,8 @@ class MainActivity : ComponentActivity() {
         selectedSuite?.takeIf { it.id == id } ?: suites.firstOrNull { it.first.id == id && it.second == null }?.first
 
     private fun stop() {
+        runCatching { listener?.close() }
+        listener = null
         runCatching { openResource?.close() }
         openResource = null
         job?.cancel()
@@ -145,8 +158,11 @@ class MainActivity : ComponentActivity() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                note(false, "${e.javaClass.simpleName}: ${e.message}")
+                // Stop closes the sockets, which fails the blocked call; that's not worth reporting.
+                if (isActive) note(false, "${e.javaClass.simpleName}: ${e.message}")
             } finally {
+                runCatching { listener?.close() }
+                listener = null
                 runCatching { openResource?.close() }
                 openResource = null
                 phase.value = Phase.Idle
@@ -168,34 +184,56 @@ class MainActivity : ComponentActivity() {
         return channel
     }
 
+    /** Listens until Stop: each sender connects, both people compare the code, then it sends any number of items. */
     private fun receive() = session {
-        val listener = withContext(Dispatchers.IO) { TcpTransport.Listener() }
-        openResource = listener
-        phase.value = Phase.Listening(localAddresses(), listener.port)
-        val connection = withContext(Dispatchers.IO) { listener.accept() }
-        listener.close()
-        openResource = connection
-        note(true, "Connection from ${connection.peer}")
-        phase.value = Phase.Busy("Key exchange…")
-        val pending = withContext(Dispatchers.IO) { Handshake.respond(connection, ::suiteFor) }
-        val channel = compare(pending)
-        phase.value = Phase.Busy("Receiving…")
+        val server = withContext(Dispatchers.IO) { TcpTransport.Listener() }
+        listener = server
+        val addresses = localAddresses()
         val dir = File(cacheDir, "received").apply { mkdirs() }
-        var file: File? = null
-        val result = withContext(Dispatchers.IO) {
-            Transfer.receive(channel, MAX_RECEIVE_BYTES) { name, _ ->
-                File(dir, safeName(name)).also { file = it }.outputStream()
+        while (true) {
+            phase.value = Phase.Listening(addresses, server.port)
+            val connection = withContext(Dispatchers.IO) { server.accept() }
+            openResource = connection
+            val peer = connection.peer
+            try {
+                note(true, "Connection from $peer")
+                phase.value = Phase.Busy("Key exchange with $peer…")
+                val pending = withContext(Dispatchers.IO) { Handshake.respond(connection, ::suiteFor) }
+                val channel = compare(pending)
+                phase.value = Phase.Receiving(peer, pending.sas, 0)
+                var file: File? = null
+                val count = withContext(Dispatchers.IO) {
+                    Transfer.receiveAll(
+                        channel,
+                        MAX_RECEIVE_BYTES,
+                        { name, _ -> File(dir, safeName(name)).also { file = it }.outputStream() },
+                    ) { result ->
+                        val preview = file?.takeIf { it.length() <= PREVIEW_BYTES }?.readText()?.let { "\nText: $it" }.orEmpty()
+                        note(true, "Received \"${result.name}\": ${result.bytes} bytes in ${result.millis} ms, SHA-256 ${result.sha256.take(16)}… matches$preview")
+                        runOnUiThread { (phase.value as? Phase.Receiving)?.let { phase.value = it.copy(received = it.received + 1) } }
+                    }
+                }
+                note(true, "$peer disconnected after $count item(s); still waiting for senders")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!currentCoroutineContext().isActive) throw e
+                // One failed sender (wrong code, dropped connection, ...) doesn't stop the receiver.
+                note(false, "$peer: ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                runCatching { connection.close() }
+                openResource = null
             }
         }
-        channel.close()
-        val preview = file?.takeIf { it.length() <= PREVIEW_BYTES }?.readText()?.let { "\nText: $it" }.orEmpty()
-        note(true, "Received \"${result.name}\": ${result.bytes} bytes in ${result.millis} ms, SHA-256 ${result.sha256.take(16)}… matches$preview")
     }
 
-    private fun send(target: String, payload: Payload) = session {
+    /** Connects and, once both people confirm the code, sends whatever is queued until Disconnect. */
+    private fun connect(target: String) = session {
         val suite = selectedSuite ?: throw IllegalStateException("Choose a suite that works on this phone")
-        val host = target.substringBefore(':').trim()
-        val port = target.substringAfter(':', "").trim().toIntOrNull() ?: TcpTransport.DEFAULT_PORT
+        // Pasted or typed addresses sometimes carry spaces ("100. 86.77.63").
+        val address = target.filterNot { it.isWhitespace() }
+        val host = address.substringBefore(':')
+        val port = address.substringAfter(':', "").toIntOrNull() ?: TcpTransport.DEFAULT_PORT
         if (host.isEmpty()) throw IllegalArgumentException("Enter the other phone's address")
         phase.value = Phase.Busy("Connecting to $host:$port…")
         val connection = withContext(Dispatchers.IO) { TcpTransport.connect(host, port) }
@@ -203,14 +241,27 @@ class MainActivity : ComponentActivity() {
         phase.value = Phase.Busy("Key exchange…")
         val pending = withContext(Dispatchers.IO) { Handshake.initiate(connection, suite) }
         val channel = compare(pending)
-        phase.value = Phase.Busy("Sending ${payload.name}…")
-        val result = withContext(Dispatchers.IO) { payload.open().use { Transfer.send(channel, payload.name, payload.size, it) } }
+        val outbox = Channel<Payload>(Channel.UNLIMITED)
+        val connected = Phase.Connected(connection.peer, pending.sas, suite.label, outbox)
+        phase.value = connected
+        for (payload in outbox) {
+            phase.value = Phase.Busy("Sending ${payload.name}…")
+            val result = withContext(Dispatchers.IO) { payload.open().use { Transfer.send(channel, payload.name, payload.size, it) } }
+            note(
+                true,
+                "Sent \"${result.name}\": ${result.bytes} bytes in ${result.millis} ms " +
+                    "(%.1f MB/s); the receiver confirmed SHA-256 ${result.sha256.take(16)}…".format(result.megabytesPerSecond),
+            )
+            phase.value = connected
+        }
+        withContext(Dispatchers.IO) { Transfer.finish(channel) }
         channel.close()
-        note(
-            true,
-            "Sent \"${result.name}\": ${result.bytes} bytes in ${result.millis} ms " +
-                "(%.1f MB/s); the receiver confirmed SHA-256 ${result.sha256.take(16)}…".format(result.megabytesPerSecond),
-        )
+        note(true, "Disconnected from ${connection.peer}")
+    }
+
+    /** Queues [payload] on the connected session, if there is one. */
+    private fun send(payload: Payload) {
+        (phase.value as? Phase.Connected)?.outbox?.trySend(payload)
     }
 
     private fun selfTest() = session {
@@ -247,7 +298,7 @@ class MainActivity : ComponentActivity() {
         val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
                 runCatching { filePayload(uri) }
-                    .onSuccess { send(target, it) }
+                    .onSuccess { send(it) }
                     .onFailure { note(false, "${it.javaClass.simpleName}: ${it.message}") }
             }
         }
@@ -306,12 +357,41 @@ class MainActivity : ComponentActivity() {
                         OutlinedButton(onClick = { current.answer.complete(false) }) { Text("They differ") }
                     }
                 }
-                is Phase.Listening -> Section("Waiting for the other phone") {
-                    Text("On the other phone, send to one of:")
-                    current.addresses.ifEmpty { listOf("(no network address; join Wi-Fi or turn on a hotspot)") }.forEach {
-                        Text(if (current.port == TcpTransport.DEFAULT_PORT) it else "$it:${current.port}", fontFamily = FontFamily.Monospace)
+                is Phase.Listening -> Section("Waiting for senders") {
+                    Text("On the other phone, connect to this phone's Wi-Fi or hotspot address:")
+                    if (current.addresses.isEmpty()) Text("(no network address; join Wi-Fi or turn on a hotspot)")
+                    current.addresses.forEach { (ip, iface) ->
+                        val address = if (current.port == TcpTransport.DEFAULT_PORT) ip else "$ip:${current.port}"
+                        val hint = if (isLocalNetwork(iface)) iface else "$iface, probably not reachable"
+                        Text("$address  ($hint)", fontFamily = FontFamily.Monospace)
                     }
+                    Text("Keeps listening until you stop it.", style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = ::stop) { Text("Stop") }
+                }
+                is Phase.Receiving -> Section("Connected to ${current.peer}") {
+                    Text("Code ${current.sas} · ${current.received} item(s) received. The sender can keep sending until it disconnects.")
+                    OutlinedButton(onClick = ::stop) { Text("Stop receiving") }
+                }
+                is Phase.Connected -> Section("Connected to ${current.peer}") {
+                    Text("Code ${current.sas} · ${current.suite}", style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = message,
+                        onValueChange = { message = it },
+                        label = { Text("Message") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            val bytes = message.toByteArray()
+                            send(Payload("message.txt", bytes.size.toLong()) { ByteArrayInputStream(bytes) })
+                        }) { Text("Send message") }
+                        OutlinedButton(onClick = { pickFile.launch(arrayOf("*/*")) }) { Text("Send file") }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { send(randomPayload(1 shl 20)) }) { Text("1 MB test") }
+                        OutlinedButton(onClick = { send(randomPayload(10 shl 20)) }) { Text("10 MB test") }
+                    }
+                    OutlinedButton(onClick = { current.outbox.close() }) { Text("Disconnect") }
                 }
                 is Phase.Busy -> Section(current.what) {
                     OutlinedButton(onClick = ::stop) { Text("Cancel") }
@@ -323,7 +403,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Section("Receive") {
                         Text("Both phones on the same Wi-Fi or hotspot. Port ${TcpTransport.DEFAULT_PORT}.")
-                        Button(onClick = ::receive) { Text("Wait for a sender") }
+                        Button(onClick = ::receive) { Text("Wait for senders") }
                     }
                     Section("Send") {
                         OutlinedTextField(
@@ -333,23 +413,11 @@ class MainActivity : ComponentActivity() {
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        OutlinedTextField(
-                            value = message,
-                            onValueChange = { message = it },
-                            label = { Text("Message") },
-                            modifier = Modifier.fillMaxWidth(),
+                        Text(
+                            "Compare the code once; then send as many messages and files as you like.",
+                            style = MaterialTheme.typography.bodySmall,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                val bytes = message.toByteArray()
-                                send(target, Payload("message.txt", bytes.size.toLong()) { ByteArrayInputStream(bytes) })
-                            }) { Text("Send message") }
-                            OutlinedButton(onClick = { pickFile.launch(arrayOf("*/*")) }) { Text("Send file") }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { send(target, randomPayload(1 shl 20)) }) { Text("1 MB test") }
-                            OutlinedButton(onClick = { send(target, randomPayload(10 shl 20)) }) { Text("10 MB test") }
-                        }
+                        Button(onClick = { connect(target) }) { Text("Connect") }
                     }
                 }
             }
@@ -382,14 +450,26 @@ class MainActivity : ComponentActivity() {
         const val MAX_RECEIVE_BYTES = 200L * 1024 * 1024
         const val PREVIEW_BYTES = 2048
 
-        /** IPv4 addresses of this phone on Wi-Fi, hotspot or Ethernet (not loopback or mobile data). */
-        fun localAddresses(): List<String> = runCatching {
+        /** Wi-Fi, hotspot, Wi-Fi Direct and Ethernet interfaces: the ones another phone nearby can reach. */
+        private val LOCAL_INTERFACES = listOf("wlan", "swlan", "ap", "p2p", "eth")
+
+        /** Mobile-data interfaces (Qualcomm, MediaTek): never reachable from the other phone. */
+        private val MOBILE_INTERFACES = listOf("rmnet", "ccmni", "v4-rmnet", "v4-ccmni")
+
+        fun isLocalNetwork(iface: String) = LOCAL_INTERFACES.any { iface.startsWith(it) }
+
+        /**
+         * IPv4 addresses of this phone with their interface, Wi-Fi and hotspot first. Others (VPN tunnels, a
+         * carrier's 100.x address) are listed last, marked as probably not reachable.
+         */
+        fun localAddresses(): List<Pair<String, String>> = runCatching {
             NetworkInterface.getNetworkInterfaces().toList()
-                .filter { it.isUp && !it.isLoopback && !it.name.startsWith("rmnet") }
-                .flatMap { it.inetAddresses.toList() }
-                .filterIsInstance<Inet4Address>()
-                .map { it.hostAddress.orEmpty() }
-                .filter { it.isNotEmpty() }
+                .filter { nif -> nif.isUp && !nif.isLoopback && MOBILE_INTERFACES.none { nif.name.startsWith(it) } }
+                .flatMap { nif ->
+                    nif.inetAddresses.toList().filterIsInstance<Inet4Address>().map { it.hostAddress.orEmpty() to nif.name }
+                }
+                .filter { it.first.isNotEmpty() }
+                .sortedBy { if (isLocalNetwork(it.second)) 0 else 1 }
         }.getOrDefault(emptyList())
 
         /** Keeps the sender's file name from escaping the received folder. */

@@ -9,9 +9,10 @@ final and working, it can be moved into the real apps.
 1. Get the APK from the **Crypto Lab** workflow (Actions → Crypto Lab → artifact `cryptolab-debug-apk`) and install it on two phones (Android 14+).
 2. **Run self-test** on one phone. It runs every approach over loopback, plus the attacks below.
 3. Put both phones on the same Wi-Fi network, or connect one to the other's hotspot.
-   - Phone A: **Wait for a sender**. It shows its address.
-   - Phone B: enter that address and **Send message**, **Send file**, or send a 1 MB / 10 MB test.
+   - Phone A: **Wait for senders**. It lists its addresses, Wi-Fi and hotspot first, and keeps listening until **Stop**.
+   - Phone B: enter phone A's Wi-Fi address and tap **Connect**.
 4. Both phones show a 6-digit code. Tap **Codes match** only if the two codes are the same.
+5. Phone B can now send any number of messages, files, or 1 MB / 10 MB tests over that one channel. **Disconnect** ends the session; phone A keeps waiting for the next sender.
 
 ## How the channel works
 
@@ -63,4 +64,5 @@ They check:
 
 - **Passkeys can't be moved with this.** Passkey Vault's private keys are created non-exportable in the Keystore. Moving passkeys between phones would need a different design, for example syncable keys or creating new passkeys on the new phone.
 - **The receiving phone listens on port 47800.** Anyone on the network can connect to it, but a transfer only goes ahead after both people confirm the code.
+- **A connected sender that stays idle for 5 minutes is dropped** by the receiver's read timeout; connect again.
 - **Received files are saved to the app's cache folder** (`cache/received/`). Received text up to 2 KB is also shown in the log.

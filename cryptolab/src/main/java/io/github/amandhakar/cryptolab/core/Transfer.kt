@@ -49,6 +49,33 @@ object Transfer {
         return Result(name, sent, hash.hex(), (System.nanoTime() - started) / 1_000_000)
     }
 
+    /** Ends a session of transfers: the other phone's [receiveAll] returns. */
+    fun finish(channel: SecureChannel) = channel.send(RecordType.CLOSE, ByteArray(0))
+
+    /**
+     * Receives payloads one after another until the sender calls [finish], calling [onResult] after each.
+     * Returns how many were received.
+     */
+    fun receiveAll(
+        channel: SecureChannel,
+        maxBytes: Long,
+        open: (name: String, size: Long) -> OutputStream,
+        onResult: (Result) -> Unit,
+    ): Int {
+        var count = 0
+        while (true) {
+            val record = channel.receive()
+            when (record.type) {
+                RecordType.CLOSE -> return count
+                RecordType.START -> {
+                    onResult(receiveBody(channel, record, maxBytes, open))
+                    count++
+                }
+                else -> throw ProtocolException("Expected START or CLOSE, got record ${record.type}")
+            }
+        }
+    }
+
     /**
      * Receives one payload. [open] gets the announced name and size and returns where to write it.
      * Payloads over [maxBytes] are refused before anything is written.
@@ -56,6 +83,15 @@ object Transfer {
     fun receive(channel: SecureChannel, maxBytes: Long, open: (name: String, size: Long) -> OutputStream): Result {
         val start = channel.receive()
         if (start.type != RecordType.START) throw ProtocolException("Expected START, got record ${start.type}")
+        return receiveBody(channel, start, maxBytes, open)
+    }
+
+    private fun receiveBody(
+        channel: SecureChannel,
+        start: Record,
+        maxBytes: Long,
+        open: (name: String, size: Long) -> OutputStream,
+    ): Result {
         val r = WireReader(start.payload)
         val name = r.string()
         val size = r.u64()

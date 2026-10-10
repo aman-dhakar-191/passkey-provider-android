@@ -44,6 +44,26 @@ class ChannelTest {
     }
 
     @Test
+    fun `one session carries several transfers until the sender finishes`() {
+        val suite = Suites.software.first()
+        val (a, b) = SelfTest.loopbackPair()
+        val (i, r) = SelfTest.openPair(suite, a, b)
+        val payloads = listOf("first".toByteArray(), ByteArray(Transfer.CHUNK + 5) { 7 }, "third".toByteArray())
+        val sinks = mutableListOf<ByteArrayOutputStream>()
+        val results = mutableListOf<Transfer.Result>()
+        val received = background {
+            Transfer.receiveAll(r, 1L shl 20, { _, _ -> ByteArrayOutputStream().also { sinks += it } }) { results += it }
+        }
+        payloads.forEachIndexed { n, p -> Transfer.send(i, "item$n", p.size.toLong(), ByteArrayInputStream(p)) }
+        Transfer.finish(i)
+        assertEquals(3, received.get(30, TimeUnit.SECONDS))
+        payloads.forEachIndexed { n, p -> assertArrayEquals(p, sinks[n].toByteArray()) }
+        assertEquals(listOf("item0", "item1", "item2"), results.map { it.name })
+        i.close()
+        r.close()
+    }
+
+    @Test
     fun `receiver refuses a payload over its limit`() {
         val suite = Suites.software.first()
         val (a, b) = SelfTest.loopbackPair()
