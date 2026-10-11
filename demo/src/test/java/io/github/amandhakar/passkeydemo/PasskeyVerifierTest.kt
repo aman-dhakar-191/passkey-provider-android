@@ -92,12 +92,18 @@ class PasskeyVerifierTest {
         assertTrue("wrong type", failed(signIn(clientData = clientData("webauthn.create"))).any { it.startsWith("clientDataJSON type") })
         assertTrue("no UV", failed(signIn(authData = authData(flags = 0x01))).any { it.startsWith("User verified") })
         assertTrue("no UP", failed(signIn(authData = authData(flags = 0x04))).any { it.startsWith("User present") })
-        assertTrue("synced flag", failed(signIn(authData = authData(flags = 0x1d))).any { it.startsWith("Device-bound") })
+        // Backed up without backup eligible breaks WebAuthn's rule; a moved passkey (BE + BS) is fine.
+        assertTrue("BS without BE", failed(signIn(authData = authData(flags = 0x15))).any { it.startsWith("Backup flags") })
+        assertEquals("moved passkey", emptyList<String>(), failed(signIn(authData = authData(flags = 0x1d))))
         // The signature must cover the client data that was returned, and come from the registered key.
         assertTrue("signed other client data", failed(signIn(signedClientData = clientData("webauthn.get", ByteArray(32)))).any { it.startsWith("Signature") })
         val other = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
         assertTrue("other key", failed(signIn(signWith = other)).any { it.startsWith("Signature") })
-        assertTrue("unknown credential", failed(signIn(), lookup = { null }).any { it.startsWith("Passkey is known") })
+        // A passkey the demo never saw being made can't be checked: reported as not checked, not as a pass or failure.
+        val unknown = PasskeyVerifier.verifySignIn(rpId, challenge, signIn(), origin) { null }
+        assertEquals(emptyList<String>(), failures(unknown))
+        assertTrue(unknown.any { it.skipped && it.name.startsWith("Signature not checked") })
+        assertEquals("11 checks passed, 1 not checked", Report("t", unknown).summary())
     }
 
     @Test fun registrationIsRejectedWhenAnythingIsOff() {

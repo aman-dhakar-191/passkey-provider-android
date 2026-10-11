@@ -8,17 +8,32 @@ import java.security.interfaces.ECPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
-/** One line of a test report: what was checked, whether it held, and why not (or what was seen). */
-data class Check(val name: String, val ok: Boolean, val detail: String = "")
+/**
+ * One line of a test report: what was checked, whether it held, and why not (or what was seen).
+ * [skipped]: the demo had no way to check it (not a failure, not a pass either).
+ */
+data class Check(val name: String, val ok: Boolean, val detail: String = "", val skipped: Boolean = false)
 
 data class Report(val title: String, val checks: List<Check>, val note: String? = null) {
     val ok get() = checks.all { it.ok }
 
+    /** "All 12 checks passed", "11 checks passed, 1 not checked" or "2 of 12 checks failed". */
+    fun summary(): String {
+        val failed = checks.count { !it.ok }
+        val skipped = checks.count { it.skipped }
+        return when {
+            failed > 0 -> "$failed of ${checks.size} checks failed"
+            skipped > 0 -> "${checks.size - skipped} checks passed, $skipped not checked"
+            else -> "All ${checks.size} checks passed"
+        }
+    }
+
     fun toText(): String = buildString {
         append(title).append(": ")
-        append(if (ok) "all ${checks.size} checks passed" else "${checks.count { !it.ok }} of ${checks.size} checks FAILED")
+        // Copied reports keep shouting failures, as before.
+        append(if (ok) summary() else "${checks.count { !it.ok }} of ${checks.size} checks FAILED")
         for (c in checks) {
-            append("\n  ").append(if (c.ok) "[ok] " else "[FAIL] ").append(c.name)
+            append("\n  ").append(if (c.skipped) "[not checked] " else if (c.ok) "[ok] " else "[FAIL] ").append(c.name)
             if (c.detail.isNotBlank()) append("\n       ").append(c.detail)
         }
         note?.let { append("\n  ").append(it) }
@@ -113,7 +128,15 @@ object PasskeyVerifier {
 
             val stored = publicKeyFor(id)
             if (stored == null) {
-                checks += Check("Passkey is known to this demo", false, "created elsewhere or before 'Forget'; create it here first so its public key is known")
+                // Like a website, the demo needs the public key from registration; it keeps them on the phone that
+                // made the passkey. A passkey moved from another phone (or made before 'Forget') isn't there.
+                checks += Check(
+                    "Signature not checked: this demo didn't see this passkey being made",
+                    ok = true,
+                    detail = "made on another phone (e.g. moved there) or before 'Forget'. A real site keeps the public " +
+                        "key on its server and checks it; to test that, use a site such as webauthn.io",
+                    skipped = true,
+                )
             } else {
                 val key = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(stored))
                 val valid = Signature.getInstance("SHA256withECDSA").run {
@@ -153,10 +176,17 @@ object PasskeyVerifier {
         val flags = authData[32].toInt() and 0xff
         checks += Check("User present (UP)", flags and FLAG_UP != 0)
         checks += Check("User verified (UV)", flags and FLAG_UV != 0)
+        // WebAuthn L3 §6.1.3: "backed up" (BS) may only be set on a "backup eligible" (BE) credential.
+        val kind = when {
+            flags and FLAG_BE == 0 && flags and FLAG_BS == 0 -> "device-bound (stays on one phone)"
+            flags and FLAG_BE != 0 && flags and FLAG_BS == 0 -> "movable, not copied to another device yet"
+            flags and FLAG_BE != 0 -> "movable, and a copy exists on another device (backed up)"
+            else -> "INVALID: marked backed up but not backup eligible"
+        }
         checks += Check(
-            "Device-bound passkey (not marked as backed up or synced)",
-            flags and (FLAG_BE or FLAG_BS) == 0,
-            "flags: 0x%02x".format(flags),
+            "Backup flags are valid (BS only with BE)",
+            !(flags and FLAG_BS != 0 && flags and FLAG_BE == 0),
+            "$kind; flags: 0x%02x".format(flags),
         )
     }
 }
