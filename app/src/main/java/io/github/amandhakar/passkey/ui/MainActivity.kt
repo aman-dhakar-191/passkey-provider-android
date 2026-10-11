@@ -26,6 +26,7 @@ import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.provider.PasskeyProviderService
 import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.provider.verifyUser
+import io.github.amandhakar.passkey.transfer.MovablePasskeys
 import io.github.amandhakar.passkey.update.Release
 import io.github.amandhakar.passkey.update.Updater
 import io.github.amandhakar.passkey.webauthn.Base64Url
@@ -72,6 +73,7 @@ class MainActivity : FragmentActivity() {
                     onInstallUpdate = ::installUpdate,
                     onCopyProblems = ::copyProblems,
                     onClearProblems = { ProviderErrors.clear(this) },
+                    onMovePasskeys = if (MovablePasskeys.ENABLED) ({ MovablePasskeys.open(this) }) else null,
                 )
             }
         }

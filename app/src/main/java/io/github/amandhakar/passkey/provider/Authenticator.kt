@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.data.PasskeyStore
+import io.github.amandhakar.passkey.transfer.MovablePasskeys
 import io.github.amandhakar.passkey.webauthn.AssertionOptions
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import io.github.amandhakar.passkey.webauthn.CreationOptions
@@ -19,19 +20,24 @@ import java.security.Signature
  * over that hash; the clientDataJSON we return is then ignored by the browser.
  */
 class Authenticator(context: Context) {
+    private val context = context.applicationContext
     private val store = PasskeyStore.get(context)
 
     // "none" attestation carries no signature, so registration never needs the client data hash.
     fun register(options: CreationOptions, rpId: String, origin: String): String {
         val credentialId = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val publicKey = PasskeyKeys.generate(credentialId)
+        // GitHub build setting: a movable passkey's key is made so it can later be sent to a new phone.
+        val movable = MovablePasskeys.newPasskeysMovable(context)
+        val (publicKey, wrappedKey) =
+            if (movable) MovablePasskeys.createKey(context, credentialId) else PasskeyKeys.generate(credentialId) to ""
         val cose = WebAuthnEncoding.coseEs256PublicKey(
             WebAuthnEncoding.unsignedFixed(publicKey.w.affineX),
             WebAuthnEncoding.unsignedFixed(publicKey.w.affineY),
         )
         val authData = WebAuthnEncoding.authenticatorData(
             rpId = rpId,
-            flags = WebAuthnEncoding.FLAG_USER_PRESENT or WebAuthnEncoding.FLAG_USER_VERIFIED,
+            flags = backupFlags(movable, backedUp = false) or
+                WebAuthnEncoding.FLAG_USER_PRESENT or WebAuthnEncoding.FLAG_USER_VERIFIED,
             signCount = 0,
             attestedCredentialData = WebAuthnEncoding.attestedCredentialData(credentialId, cose),
         )
@@ -48,6 +54,8 @@ class Authenticator(context: Context) {
                 displayName = options.userDisplayName,
                 createdAt = now,
                 lastUsedAt = now,
+                movable = movable,
+                wrappedKey = wrappedKey,
             ),
         )
         replaced.forEach { PasskeyKeys.delete(Base64Url.decode(it.credentialId)) }
@@ -72,7 +80,8 @@ class Authenticator(context: Context) {
         val credentialId = Base64Url.decode(passkey.credentialId)
         val authData = WebAuthnEncoding.authenticatorData(
             rpId = passkey.rpId,
-            flags = WebAuthnEncoding.FLAG_USER_PRESENT or WebAuthnEncoding.FLAG_USER_VERIFIED,
+            flags = backupFlags(passkey.movable, passkey.backedUp) or
+                WebAuthnEncoding.FLAG_USER_PRESENT or WebAuthnEncoding.FLAG_USER_VERIFIED,
             // Passkeys conventionally report 0: the RP must not expect a counter from a syncable-style credential.
             signCount = 0,
         )
@@ -88,4 +97,9 @@ class Authenticator(context: Context) {
             userHandle = Base64Url.decode(passkey.userId),
         )
     }
+
+    /** WebAuthn backup flags: movable passkeys are "backup eligible", and "backed up" once a copy exists elsewhere. */
+    private fun backupFlags(movable: Boolean, backedUp: Boolean): Int =
+        (if (movable) WebAuthnEncoding.FLAG_BACKUP_ELIGIBLE else 0) or
+            (if (movable && backedUp) WebAuthnEncoding.FLAG_BACKED_UP else 0)
 }

@@ -23,6 +23,28 @@ class PasskeyStoreTest {
         assertEquals(setOf("b", "c", "d"), store.all().map { it.credentialId }.toSet())
     }
 
+    @Test fun receivedPasskeyNeverReplacesOneAlreadyHere() {
+        val store = PasskeyStore(File(tmp.root, "p.json"))
+        store.add(passkey("a"))
+        assertEquals(false, store.addIfAbsent(passkey("a"))) // same credential
+        assertEquals(false, store.addIfAbsent(passkey("b"))) // same account on the same site
+        assertEquals(true, store.addIfAbsent(passkey("c", user = "u2")))
+        assertEquals(setOf("a", "c"), store.all().map { it.credentialId }.toSet())
+    }
+
+    @Test fun persistsMovableFieldsAndBackedUp() {
+        val file = File(tmp.root, "p.json")
+        PasskeyStore(file).apply {
+            add(passkey("a").copy(movable = true, wrappedKey = "d3JhcHBlZA"))
+            add(passkey("b", user = "u2"))
+            markBackedUp(setOf("a"))
+        }
+        val (a, b) = PasskeyStore(file).all().sortedBy { it.credentialId }
+        assertTrue(a.movable && a.backedUp)
+        assertEquals("d3JhcHBlZA", a.wrappedKey)
+        assertTrue(!b.movable && !b.backedUp && b.wrappedKey.isEmpty())
+    }
+
     @Test fun persistsRenameMarkUsedAndRemove() {
         val file = File(tmp.root, "p.json")
         PasskeyStore(file).apply {

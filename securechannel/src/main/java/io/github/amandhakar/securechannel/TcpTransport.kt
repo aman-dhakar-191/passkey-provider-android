@@ -1,7 +1,5 @@
-package io.github.amandhakar.cryptolab.transport
+package io.github.amandhakar.securechannel
 
-import io.github.amandhakar.cryptolab.core.Connection
-import io.github.amandhakar.cryptolab.core.Listener
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.InputStream

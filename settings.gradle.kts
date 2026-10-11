@@ -17,3 +17,4 @@ rootProject.name = "PasskeyProvider"
 include(":app")
 include(":demo")
 include(":cryptolab")
+include(":securechannel")

@@ -9,6 +9,10 @@ import java.util.UUID
 object WebAuthnEncoding {
     const val FLAG_USER_PRESENT = 0x01
     const val FLAG_USER_VERIFIED = 0x04
+    /** Backup eligible: the credential can exist on more than one device (movable passkeys). */
+    const val FLAG_BACKUP_ELIGIBLE = 0x08
+    /** Backed up: it currently does (it was moved to, or came from, another phone). */
+    const val FLAG_BACKED_UP = 0x10
     const val FLAG_ATTESTED_DATA = 0x40
     const val COSE_ALG_ES256 = -7
 

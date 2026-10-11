@@ -78,7 +78,8 @@ android {
 
     // Two release channels from the same code (src/main is shared):
     //  - github: sideloaded from GitHub Releases. src/github adds the self-updater, its permissions
-    //            (REQUEST_INSTALL_PACKAGES, POST_NOTIFICATIONS) and WorkManager.
+    //            (REQUEST_INSTALL_PACKAGES, POST_NOTIFICATIONS) and WorkManager, and moving passkeys to a
+    //            new phone (src/github/java/.../transfer, a setting that is off by default).
     //  - store:  Google Play / Indus Appstore, which deliver updates. src/store only has a stub, so the
     //            store app contains no update code at all (checked by scripts/check-store-build.sh).
     flavorDimensions += "distribution"
@@ -132,6 +133,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.biometric)
     "githubImplementation"(libs.androidx.work.runtime.ktx) // only the self-updater uses WorkManager
+    // Moving passkeys to a new phone: the secure channel (shared with Crypto Lab) and drawing the QR code.
+    "githubImplementation"(project(":securechannel"))
+    "githubImplementation"(libs.zxing.core)
     implementation(libs.play.services.code.scanner)
     implementation(libs.kotlinx.coroutines.android)
 

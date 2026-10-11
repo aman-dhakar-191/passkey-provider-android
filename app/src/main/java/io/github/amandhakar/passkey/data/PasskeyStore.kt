@@ -20,6 +20,16 @@ data class Passkey(
     val lastUsedAt: Long,
     /** Optional name the user gave this passkey in the app; empty = none. */
     val label: String = "",
+    /**
+     * Can be moved to another phone (GitHub build setting). Its key was made outside the Keystore and
+     * imported; [wrappedKey] is an encrypted copy that only this phone's Keystore vault key can open.
+     * Sites see it as "backup eligible". Fixed when the passkey is created.
+     */
+    val movable: Boolean = false,
+    /** A copy exists on another phone (it was moved there, or came from one): the "backed up" flag. */
+    val backedUp: Boolean = false,
+    /** base64url; empty unless [movable]. */
+    val wrappedKey: String = "",
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("credentialId", credentialId)
@@ -31,6 +41,9 @@ data class Passkey(
         .put("createdAt", createdAt)
         .put("lastUsedAt", lastUsedAt)
         .put("label", label)
+        .put("movable", movable)
+        .put("backedUp", backedUp)
+        .put("wrappedKey", wrappedKey)
 
     companion object {
         fun fromJson(o: JSONObject) = Passkey(
@@ -43,6 +56,9 @@ data class Passkey(
             createdAt = o.optLong("createdAt"),
             lastUsedAt = o.optLong("lastUsedAt"),
             label = o.optString("label"),
+            movable = o.optBoolean("movable"),
+            backedUp = o.optBoolean("backedUp"),
+            wrappedKey = o.optString("wrappedKey"),
         )
     }
 }
@@ -86,6 +102,25 @@ class PasskeyStore internal constructor(private val file: File) {
         val replaced = state.value.filter { it.rpId == passkey.rpId && it.userId == passkey.userId }
         save(state.value - replaced.toSet() + passkey)
         return replaced
+    }
+
+    /**
+     * Adds a passkey received from another phone, unless this phone already has it or another passkey for
+     * the same account (which [add] would replace). Returns whether it was added.
+     */
+    @Synchronized
+    fun addIfAbsent(passkey: Passkey): Boolean {
+        val exists = state.value.any {
+            it.credentialId == passkey.credentialId || (it.rpId == passkey.rpId && it.userId == passkey.userId)
+        }
+        if (exists) return false
+        save(state.value + passkey)
+        return true
+    }
+
+    @Synchronized
+    fun markBackedUp(credentialIds: Set<String>) {
+        save(state.value.map { if (it.credentialId in credentialIds) it.copy(backedUp = true) else it })
     }
 
     @Synchronized

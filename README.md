@@ -20,7 +20,8 @@ Requires **Android 14 (API 34) or newer**, with a screen lock set up.
 | Create / sign-in activities (verify the caller, then prompt for biometrics or screen lock) | `provider/CreatePasskeyActivity.kt`, `provider/GetPasskeyActivity.kt` |
 | Anti-phishing: browser origin allowlist and Digital Asset Links check for apps | `provider/CallerVerifier.kt` |
 | WebAuthn authenticator (authenticator data, "none" attestation, ES256 signatures) | `provider/Authenticator.kt`, `webauthn/` |
-| Private keys (Android Keystore / StrongBox; they never leave the device) | `crypto/PasskeyKeys.kt` |
+| Private keys (Android Keystore / StrongBox; they never leave the device, except movable passkeys below) | `crypto/PasskeyKeys.kt` |
+| Moving passkeys to a new phone (GitHub build only, opt-in) | `app/src/github/.../transfer/`, `securechannel/` |
 | Self-update from GitHub Releases (GitHub build only) | `app/src/github/.../update/` |
 
 **Desktop sign-in via QR code:** the QR code starts the FIDO *hybrid* protocol, which checks that
@@ -55,6 +56,17 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
   the stricter rule.
 - Keys are **not backed up or synced**. If you lose the phone, you lose its passkeys, so keep
   another sign-in method on your important accounts.
+- **Movable passkeys (GitHub build only, off by default):** *⋮ → Move passkeys → New passkeys: Can be moved*.
+  A movable passkey's key is made in the app and imported into the Keystore with the same
+  one-prompt-per-signature rule, so signing in is unchanged. An encrypted copy is kept for moving it,
+  under a Keystore "vault" key that only opens for 30 seconds after a fingerprint or screen-lock
+  check. To move: the new phone shows a QR code (*Receive from your old phone*); the old phone scans it
+  (*Send to a new phone*), confirms with fingerprint or screen lock, and sends its movable passkeys over
+  the local network through the secure channel shared with Crypto Lab (`securechannel/`), which the
+  QR code's one-time secret authenticates. Nothing goes through a server. The trade-off: the private
+  key briefly exists outside the Keystore when it's made, sent or received, and copies can exist on
+  two phones. Sites see these passkeys as "backup eligible" (and "backed up" once moved). Passkeys
+  made before the setting was on, and all passkeys in the store build, stay on their phone.
 
 ## Building
 

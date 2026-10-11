@@ -90,7 +90,7 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           VERSION: ${{ steps.version.outputs.version }}
-        run: ./gradlew --no-daemon :cryptolab:testDebugUnitTest :cryptolab:assembleRelease -PappVersionName="$VERSION"
+        run: ./gradlew --no-daemon :securechannel:testDebugUnitTest :cryptolab:assembleRelease -PappVersionName="$VERSION"
 
       - name: Verify signature and checksum
         id: apk

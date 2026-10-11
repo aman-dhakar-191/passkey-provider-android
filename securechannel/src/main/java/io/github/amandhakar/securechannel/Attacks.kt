@@ -1,4 +1,4 @@
-package io.github.amandhakar.cryptolab.core
+package io.github.amandhakar.securechannel
 
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
