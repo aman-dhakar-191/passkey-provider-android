@@ -67,6 +67,7 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
   key briefly exists outside the Keystore when it's made, sent or received, and copies can exist on
   two phones. Sites see these passkeys as "backup eligible" (and "backed up" once moved). Passkeys
   made before the setting was on, and all passkeys in the store build, stay on their phone.
+  Threats and what protects against each: [docs/MOVING-PASSKEYS-SECURITY.md](docs/MOVING-PASSKEYS-SECURITY.md).
 
 ## Building
 
