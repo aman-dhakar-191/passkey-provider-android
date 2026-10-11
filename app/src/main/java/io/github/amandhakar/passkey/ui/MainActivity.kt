@@ -83,6 +83,11 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         providerEnabled.value = isProviderEnabled()
         ProviderErrors.load(this)
+        // GitHub build: re-wraps older movable passkeys under the fingerprint-only vault if the phone was just
+        // unlocked (no prompt). Nothing to do in the store build.
+        if (MovablePasskeys.ENABLED) {
+            lifecycleScope.launch(Dispatchers.IO) { runCatching { MovablePasskeys.upgradeQuietly(this@MainActivity) } }
+        }
     }
 
     private fun copyProblems() {

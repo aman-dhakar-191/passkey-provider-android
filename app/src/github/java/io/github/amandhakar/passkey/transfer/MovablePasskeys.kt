@@ -3,9 +3,14 @@ package io.github.amandhakar.passkey.transfer
 import android.content.Context
 import android.content.Intent
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
+import android.security.keystore.UserNotAuthenticatedException
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.Passkey
+import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
@@ -23,9 +28,13 @@ import javax.crypto.Cipher
  * A movable passkey's key pair is made in software, then:
  *  - the private key is imported into the Keystore under the passkey's alias, with the same rule as every
  *    other passkey (each signature needs its own fingerprint or screen-lock prompt), so signing in is unchanged;
- *  - an encrypted copy is kept in the passkey's details ([KeyWrap]), under the "vault" key: an RSA key in the
- *    Keystore that decrypts only for 30 s after a fingerprint or screen-lock check. Only moving passkeys
- *    (TransferActivity) ever opens it.
+ *  - an encrypted copy is kept in the passkey's details ([KeyWrap]) under the "vault": an RSA key in the
+ *    Keystore that decrypts only for 30 s after a **fingerprint** check (not the PIN), and that the Keystore
+ *    destroys if fingerprints are added or removed. So someone who knows the PIN can't copy passkeys away,
+ *    not even by enrolling their own finger. Only moving passkeys (TransferActivity) ever opens it.
+ *
+ * Copies made by the first version (vault v1, which also accepted the screen lock) are re-wrapped under the
+ * fingerprint-only vault (v2) at the first chance: quietly when the phone was just unlocked, or when sending.
  *
  * The trade-off, shown in the app: unlike phone-only passkeys, the private key exists outside the Keystore
  * for a moment when it is made, moved or received, and a copy can end up on another phone.
@@ -36,15 +45,24 @@ object MovablePasskeys {
     private const val PREFS = "movable_passkeys"
     private const val KEY_NEW_MOVABLE = "new_passkeys_movable"
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-    private const val VAULT_ALIAS = "passkey_move_vault_v1"
+    private const val VAULT_V1_ALIAS = "passkey_move_vault_v1"
+    private const val VAULT_V2_ALIAS = "passkey_move_vault_v2"
     private const val VAULT_AUTH_SECONDS = 30
 
-    fun newPasskeysMovable(context: Context): Boolean =
+    /** The setting as chosen, whether or not a fingerprint is enrolled now. */
+    fun newPasskeysMovableSetting(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_NEW_MOVABLE, false)
+
+    /** True if new passkeys are made movable: the setting is on and a fingerprint is enrolled. */
+    fun newPasskeysMovable(context: Context): Boolean = newPasskeysMovableSetting(context) && fingerprintReady(context)
 
     fun setNewPasskeysMovable(context: Context, movable: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_NEW_MOVABLE, movable).apply()
     }
+
+    /** Moving passkeys needs a fingerprint (or another strong biometric); the screen lock alone isn't enough. */
+    fun fingerprintReady(context: Context): Boolean =
+        BiometricManager.from(context).canAuthenticate(BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
 
     fun open(context: Context) {
         context.startActivity(Intent(context, TransferActivity::class.java))
@@ -85,42 +103,109 @@ object MovablePasskeys {
 
     /**
      * The private key of a movable passkey (PKCS#8), for sending it to another phone. Call within 30 s of a
-     * successful fingerprint or screen-lock prompt; the Keystore refuses otherwise.
+     * successful fingerprint prompt; the Keystore refuses otherwise. A copy still under vault v1 is re-wrapped
+     * under the fingerprint-only vault on the way.
      */
-    internal fun privateKey(passkey: Passkey): ByteArray {
+    internal fun privateKey(context: Context, passkey: Passkey): ByteArray {
         require(passkey.movable && passkey.wrappedKey.isNotEmpty()) { "This passkey stays on this phone" }
-        val vault = keyStore().getKey(VAULT_ALIAS, null) as? PrivateKey
+        val blob = Base64Url.decode(passkey.wrappedKey)
+        val vault = KeyWrap.vault(blob)
+        val pkcs8 = unwrap(blob, passkey.credentialId, if (vault == KeyWrap.VAULT_V1) VAULT_V1_ALIAS else VAULT_V2_ALIAS)
+        if (vault == KeyWrap.VAULT_V1) rewrap(context, passkey, pkcs8)
+        return pkcs8
+    }
+
+    /**
+     * Re-wraps copies still under vault v1 (which also accepted the screen lock) under the fingerprint-only
+     * vault. Needs no prompt: it works only if the phone was unlocked in the last 30 s, and otherwise leaves
+     * them for the next try (or for sending, which re-wraps them too). Returns how many are left on v1.
+     */
+    fun upgradeQuietly(context: Context): Int {
+        val store = PasskeyStore.get(context)
+        val old = store.all().filter { it.movable && it.wrappedKey.isNotEmpty() && isVaultV1(it.wrappedKey) }
+        if (old.isEmpty() || !fingerprintReady(context)) return old.size
+        var left = old.size
+        for (passkey in old) {
+            val pkcs8 = runCatching { unwrap(Base64Url.decode(passkey.wrappedKey), passkey.credentialId, VAULT_V1_ALIAS) }
+                .getOrNull() ?: return left // not unlocked recently: try again another time
+            try {
+                rewrap(context, passkey, pkcs8)
+                left--
+            } finally {
+                pkcs8.fill(0)
+            }
+        }
+        if (left == 0) runCatching { keyStore().deleteEntry(VAULT_V1_ALIAS) }
+        return left
+    }
+
+    private fun isVaultV1(wrappedKey: String) =
+        runCatching { KeyWrap.vault(Base64Url.decode(wrappedKey)) == KeyWrap.VAULT_V1 }.getOrDefault(false)
+
+    private fun rewrap(context: Context, passkey: Passkey, pkcs8: ByteArray) {
+        val wrapped = KeyWrap.wrap(vaultPublicKey(), pkcs8, Base64Url.decode(passkey.credentialId))
+        PasskeyStore.get(context).setWrappedKey(passkey.credentialId, Base64Url.encode(wrapped))
+    }
+
+    private fun unwrap(blob: ByteArray, credentialId: String, alias: String): ByteArray {
+        val vault = keyStore().getKey(alias, null) as? PrivateKey
             ?: throw IllegalStateException("The key that protects movable passkeys is missing")
-        return KeyWrap.unwrap(Base64Url.decode(passkey.wrappedKey), Base64Url.decode(passkey.credentialId)) { rsa ->
-            Cipher.getInstance(KeyWrap.RSA_TRANSFORMATION).run {
-                init(Cipher.DECRYPT_MODE, vault, KeyWrap.OAEP)
-                doFinal(rsa)
+        return KeyWrap.unwrap(blob, Base64Url.decode(credentialId)) { rsa ->
+            try {
+                Cipher.getInstance(KeyWrap.RSA_TRANSFORMATION).run {
+                    init(Cipher.DECRYPT_MODE, vault, KeyWrap.OAEP)
+                    doFinal(rsa)
+                }
+            } catch (_: KeyPermanentlyInvalidatedException) {
+                throw IllegalStateException(
+                    "Fingerprints were changed after these passkeys were made, so they can no longer be moved. " +
+                        "They still sign in on this phone; passkeys made from now on can be moved.",
+                )
             }
         }
     }
 
-    /** The vault's public key, made on first use. Encrypting needs no prompt; it runs in software. */
+    /**
+     * The fingerprint-only vault's public key, made on first use (and remade if fingerprints changed, which
+     * destroys it). Encrypting needs no prompt; it runs in software.
+     */
     private fun vaultPublicKey(): PublicKey {
-        val existing = keyStore().getCertificate(VAULT_ALIAS)?.publicKey
-        val public = existing ?: KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, ANDROID_KEYSTORE).run {
-            initialize(
-                KeyGenParameterSpec.Builder(VAULT_ALIAS, KeyProperties.PURPOSE_DECRYPT)
-                    .setKeySize(3072)
-                    .setDigests(KeyProperties.DIGEST_SHA256)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
-                    .setUserAuthenticationRequired(true)
-                    .setUserAuthenticationParameters(
-                        VAULT_AUTH_SECONDS,
-                        KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
-                    )
-                    // Adding a fingerprint must not make movable passkeys unmovable.
-                    .setInvalidatedByBiometricEnrollment(false)
-                    .build(),
-            )
-            generateKeyPair().public
-        }
+        val keyStore = keyStore()
+        if (keyStore.containsAlias(VAULT_V2_ALIAS) && isInvalidated(keyStore)) keyStore.deleteEntry(VAULT_V2_ALIAS)
+        val public = keyStore.getCertificate(VAULT_V2_ALIAS)?.publicKey
+            ?: KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, ANDROID_KEYSTORE).run {
+                initialize(
+                    KeyGenParameterSpec.Builder(VAULT_V2_ALIAS, KeyProperties.PURPOSE_DECRYPT)
+                        .setKeySize(3072)
+                        .setDigests(KeyProperties.DIGEST_SHA256)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
+                        .setUserAuthenticationRequired(true)
+                        // Fingerprint only: the screen-lock PIN never unlocks the vault.
+                        .setUserAuthenticationParameters(VAULT_AUTH_SECONDS, KeyProperties.AUTH_BIOMETRIC_STRONG)
+                        // Adding a fingerprint (which only needs the PIN) destroys the vault, so a PIN alone
+                        // can't be turned into a fingerprint that copies passkeys.
+                        .setInvalidatedByBiometricEnrollment(true)
+                        .build(),
+                )
+                generateKeyPair().public
+            }
         // A plain software copy, so encryption never goes through the Keystore.
         return KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(public.encoded))
+    }
+
+    /** A vault the Keystore destroyed (fingerprints changed) can't decrypt anything any more. */
+    private fun isInvalidated(keyStore: KeyStore): Boolean {
+        val key = keyStore.getKey(VAULT_V2_ALIAS, null) as? PrivateKey ?: return true
+        return try {
+            Cipher.getInstance(KeyWrap.RSA_TRANSFORMATION).init(Cipher.DECRYPT_MODE, key, KeyWrap.OAEP)
+            false
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            true
+        } catch (_: UserNotAuthenticatedException) {
+            false // valid, just locked
+        } catch (_: Exception) {
+            false // unsure: never throw away a vault that might still be good
+        }
     }
 
     private fun keyStore() = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }

@@ -59,9 +59,9 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
 - **Movable passkeys (GitHub build only, off by default):** *⋮ → Move passkeys → New passkeys: Can be moved*.
   A movable passkey's key is made in the app and imported into the Keystore with the same
   one-prompt-per-signature rule, so signing in is unchanged. An encrypted copy is kept for moving it,
-  under a Keystore "vault" key that only opens for 30 seconds after a fingerprint or screen-lock
-  check. To move: the new phone shows a QR code (*Receive from your old phone*); the old phone scans it
-  (*Send to a new phone*), confirms with fingerprint or screen lock, and sends its movable passkeys over
+  under a Keystore "vault" key that only opens for 30 seconds after a **fingerprint** check (never the
+  PIN), and that the Keystore destroys if fingerprints are added or removed. To move: the new phone shows a QR code (*Receive from your old phone*); the old phone scans it
+  (*Send to a new phone*), confirms with a fingerprint, and sends its movable passkeys over
   the local network through the secure channel shared with Crypto Lab (`securechannel/`), which the
   QR code's one-time secret authenticates. Nothing goes through a server. The trade-off: the private
   key briefly exists outside the Keystore when it's made, sent or received, and copies can exist on

@@ -398,14 +398,19 @@ private fun ReportCard(report: Report) {
             Text(report.title, style = MaterialTheme.typography.titleSmall)
             val failed = report.checks.count { !it.ok }
             Text(
-                if (failed == 0) "All ${report.checks.size} checks passed" else "$failed of ${report.checks.size} checks failed",
+                report.summary(),
                 color = if (failed == 0) good else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
             )
             report.checks.forEach { check ->
                 Text(
-                    (if (check.ok) "✔ " else "✘ ") + check.name + if (check.detail.isNotBlank()) "\n     ${check.detail}" else "",
-                    color = if (check.ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                    (if (check.skipped) "– " else if (check.ok) "✔ " else "✘ ") + check.name +
+                        if (check.detail.isNotBlank()) "\n     ${check.detail}" else "",
+                    color = when {
+                        check.skipped -> MaterialTheme.colorScheme.onSurfaceVariant
+                        check.ok -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.error
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
