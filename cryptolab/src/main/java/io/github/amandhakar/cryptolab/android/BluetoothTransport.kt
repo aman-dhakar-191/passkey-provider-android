@@ -10,8 +10,8 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import io.github.amandhakar.cryptolab.core.Connection
-import io.github.amandhakar.cryptolab.core.Listener
+import io.github.amandhakar.securechannel.Connection
+import io.github.amandhakar.securechannel.Listener
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.InputStream

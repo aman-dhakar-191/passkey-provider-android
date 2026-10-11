@@ -2,11 +2,11 @@ package io.github.amandhakar.cryptolab.android
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import io.github.amandhakar.cryptolab.core.AesGcm
-import io.github.amandhakar.cryptolab.core.CipherSuite
-import io.github.amandhakar.cryptolab.core.KeyExchange
-import io.github.amandhakar.cryptolab.core.P256
-import io.github.amandhakar.cryptolab.core.Suites
+import io.github.amandhakar.securechannel.AesGcm
+import io.github.amandhakar.securechannel.CipherSuite
+import io.github.amandhakar.securechannel.KeyExchange
+import io.github.amandhakar.securechannel.P256
+import io.github.amandhakar.securechannel.Suites
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore

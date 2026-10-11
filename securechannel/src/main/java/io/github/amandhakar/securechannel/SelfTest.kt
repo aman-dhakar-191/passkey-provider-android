@@ -1,6 +1,5 @@
-package io.github.amandhakar.cryptolab.core
+package io.github.amandhakar.securechannel
 
-import io.github.amandhakar.cryptolab.transport.TcpTransport
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.SecureRandom

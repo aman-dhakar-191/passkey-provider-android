@@ -3,6 +3,7 @@ package io.github.amandhakar.passkey.crypto
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
+import android.security.keystore.KeyProtection
 import android.security.keystore.StrongBoxUnavailableException
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import java.security.KeyFactory
@@ -12,6 +13,7 @@ import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.ProviderException
 import java.security.Signature
+import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 
@@ -64,6 +66,34 @@ object PasskeyKeys {
         val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE)
         generator.initialize(spec)
         return generator.generateKeyPair().public as ECPublicKey
+    }
+
+    /**
+     * Stores a key pair made outside the Keystore (a movable passkey) under the passkey's alias, with the same
+     * rule as [generate]: every signature needs its own prompt. From then on it signs like any other passkey.
+     */
+    fun import(credentialId: ByteArray, privateKey: PrivateKey, certificate: X509Certificate) =
+        try {
+            import(credentialId, privateKey, certificate, strongBox = true)
+        } catch (_: StrongBoxUnavailableException) {
+            import(credentialId, privateKey, certificate, strongBox = false)
+        } catch (_: java.security.KeyStoreException) {
+            // StrongBox chips may refuse imported keys; the TEE accepts them.
+            import(credentialId, privateKey, certificate, strongBox = false)
+        }
+
+    private fun import(credentialId: ByteArray, privateKey: PrivateKey, certificate: X509Certificate, strongBox: Boolean) {
+        val protection = KeyProtection.Builder(KeyProperties.PURPOSE_SIGN)
+            .setDigests(KeyProperties.DIGEST_SHA256)
+            .setUserAuthenticationRequired(true)
+            .setUserAuthenticationParameters(
+                AUTH_PER_OPERATION,
+                KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
+            )
+            .setInvalidatedByBiometricEnrollment(false)
+            .setIsStrongBoxBacked(strongBox)
+            .build()
+        keyStore().setEntry(alias(credentialId), KeyStore.PrivateKeyEntry(privateKey, arrayOf(certificate)), protection)
     }
 
     /** True for an older key that works for 30 s after any authentication instead of once per prompt. */

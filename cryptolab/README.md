@@ -30,7 +30,8 @@ final and working, it can be moved into the real apps.
 | Records | AEAD (AES-256-GCM or ChaCha20-Poly1305). A counter is both the nonce and part of the associated data, so changed, replayed, dropped or reordered records are refused |
 | Transfer | START (name, size), 32 KiB chunks, END (SHA-256); the receiver replies with its own hash |
 
-The protocol is in `core/SecureChannel.kt`; the comments explain each choice.
+The protocol lives in the shared `securechannel` module (`securechannel/src/main/java/.../SecureChannel.kt`), which
+Passkey Vault's GitHub build also uses to move passkeys to a new phone; the comments explain each choice.
 
 ## Approaches to compare
 
@@ -39,7 +40,7 @@ The protocol is in `core/SecureChannel.kt`; the comments explain each choice.
 | Key exchange | X25519; P-256 (software); P-256 inside the Android Keystore | ML-KEM hybrid (post-quantum); a long-term identity key so phones that have paired once skip the code |
 | Encryption | AES-256-GCM, ChaCha20-Poly1305 | |
 | Authentication | QR code with a one-time secret; 6-digit code compared by people | NFC tap to share the secret |
-| Transport | TCP on the local network (`transport/TcpTransport.kt`); Bluetooth Classic RFCOMM (`android/BluetoothTransport.kt`) | Wi-Fi Direct, Nearby Connections, BLE, a relay server for phones that aren't nearby |
+| Transport | TCP on the local network (`securechannel/.../TcpTransport.kt`); Bluetooth Classic RFCOMM (`android/BluetoothTransport.kt`) | Wi-Fi Direct, Nearby Connections, BLE, a relay server for phones that aren't nearby |
 
 To add an approach:
 - **Key exchange:** implement `KeyExchange`.
@@ -57,10 +58,10 @@ a **pre-release** tagged `cryptolab-vX.Y.Z`.
 
 ## Tests
 
-`core/` and `transport/` don't import anything from Android, so the unit tests run on a plain JVM:
+The `securechannel` module doesn't import anything from Android, so its unit tests run on a plain JVM:
 
 ```bash
-./gradlew :cryptolab:testDebugUnitTest
+./gradlew :securechannel:testDebugUnitTest
 ```
 
 They check:
@@ -74,7 +75,7 @@ They check:
 
 ## Known limits
 
-- **Passkeys can't be moved with this.** Passkey Vault's private keys are created non-exportable in the Keystore. Moving passkeys between phones would need a different design, for example syncable keys or creating new passkeys on the new phone.
+- **Crypto Lab itself doesn't move passkeys.** Passkey Vault's GitHub build does, for passkeys made as "Can be moved" (see the main README); passkeys made phone-only stay non-exportable in the Keystore.
 - **The receiving phone listens on port 47800, or on Bluetooth RFCOMM.** Anyone nearby can connect, but a transfer only goes ahead with the QR secret or after both people confirm the code.
 - **The QR secret lasts for one listening session.** Anyone who sees or photographs the QR code while it's on screen can connect. Stop and start again for a new secret.
 - **A sender that didn't scan the QR code** still reaches a receiver showing one, but then both people must compare codes. If you scanned the QR code and the receiver still asks you to compare codes, someone else connected: tap **They differ**.

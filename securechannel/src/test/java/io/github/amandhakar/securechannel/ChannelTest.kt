@@ -1,4 +1,4 @@
-package io.github.amandhakar.cryptolab.core
+package io.github.amandhakar.securechannel
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

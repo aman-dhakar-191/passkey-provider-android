@@ -90,6 +90,8 @@ fun MainScreen(
     onInstallUpdate: (Release) -> Unit,
     onCopyProblems: () -> Unit,
     onClearProblems: () -> Unit,
+    /** GitHub build: moving passkeys to a new phone; null where the build doesn't have it. */
+    onMovePasskeys: (() -> Unit)? = null,
 ) {
     val passkeys by passkeysFlow.collectAsState()
     val log by problemsFlow.collectAsState()
@@ -118,6 +120,12 @@ fun MainScreen(
                             onClick = { menuOpen = false; onOpenProviderSettings() },
                         )
                         DropdownMenuItem(text = { Text("Activity log") }, onClick = { menuOpen = false; showLog = true })
+                        if (onMovePasskeys != null) {
+                            DropdownMenuItem(
+                                text = { Text("Move passkeys") },
+                                onClick = { menuOpen = false; onMovePasskeys() },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("New or lost phone?") },
                             onClick = { menuOpen = false; showPhoneHelp = true },
@@ -247,8 +255,14 @@ fun MainScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                 ) {
                     Text(
-                        "Your passkeys live only on this phone and can't be copied to another one. " +
-                            "A few minutes now saves you from being locked out later.",
+                        if (onMovePasskeys != null) {
+                            "Passkeys made as \"Can be moved\" (⋮ → Move passkeys) can be sent to a new phone while you " +
+                                "still have the old one. All others live only on this phone and can't be copied. " +
+                                "A few minutes now saves you from being locked out later."
+                        } else {
+                            "Your passkeys live only on this phone and can't be copied to another one. " +
+                                "A few minutes now saves you from being locked out later."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     HelpSection(
@@ -301,8 +315,14 @@ fun MainScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                 ) {
                     Text(
-                        "Sign in with your fingerprint instead of a password. Your keys never leave this phone " +
-                            "and aren't backed up, so keep another way to sign in to important accounts.",
+                        if (onMovePasskeys != null) {
+                            "Sign in with your fingerprint instead of a password. Your keys stay on this phone and " +
+                                "aren't backed up, unless you make passkeys movable and move them to another phone " +
+                                "yourself. Keep another way to sign in to important accounts."
+                        } else {
+                            "Sign in with your fingerprint instead of a password. Your keys never leave this phone " +
+                                "and aren't backed up, so keep another way to sign in to important accounts."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                     )
                     AboutLink(Icons.Filled.Lock, "Privacy policy") { open(Links.PRIVACY) }
@@ -496,7 +516,7 @@ private fun PasskeyRow(passkey: Passkey, onRename: () -> Unit, onDelete: () -> U
                 Text(passkey.label.ifBlank { account }, style = MaterialTheme.typography.titleSmall)
                 if (passkey.label.isNotBlank()) Text(account, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "Last used $date",
+                    "Last used $date" + if (passkey.movable) " · Can be moved" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

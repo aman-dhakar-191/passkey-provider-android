@@ -1,4 +1,4 @@
-package io.github.amandhakar.cryptolab.core
+package io.github.amandhakar.securechannel
 
 import java.io.InputStream
 import java.io.OutputStream

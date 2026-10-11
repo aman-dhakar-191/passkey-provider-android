@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- GitHub channel only: the self-updater (src/github/java/.../update). Store builds contain none of this. -->
+<!-- GitHub channel only: the self-updater (src/github/java/.../update) and moving passkeys to a new phone
+     (src/github/java/.../transfer). Store builds contain none of this. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -9,5 +10,11 @@
         <receiver
             android:name="io.github.amandhakar.passkey.update.InstallResultReceiver"
             android:exported="false" />
+
+        <!-- Moving passkeys to another phone (src/github/java/.../transfer). Opened only from the app's menu. -->
+        <activity
+            android:name="io.github.amandhakar.passkey.transfer.TransferActivity"
+            android:exported="false"
+            android:label="Move passkeys" />
     </application>
 </manifest>
