@@ -54,12 +54,14 @@ object Transfer {
 
     /**
      * Receives payloads one after another until the sender calls [finish], calling [onResult] after each.
-     * Returns how many were received.
+     * Returns how many were received. More than [maxItems] payloads are refused, so a sender can't make the
+     * receiver keep [maxBytes] in memory over and over.
      */
     fun receiveAll(
         channel: SecureChannel,
         maxBytes: Long,
         open: (name: String, size: Long) -> OutputStream,
+        maxItems: Int = Int.MAX_VALUE,
         onResult: (Result) -> Unit,
     ): Int {
         var count = 0
@@ -68,6 +70,7 @@ object Transfer {
             when (record.type) {
                 RecordType.CLOSE -> return count
                 RecordType.START -> {
+                    if (count >= maxItems) throw ProtocolException("More than $maxItems items refused")
                     onResult(receiveBody(channel, record, maxBytes, open))
                     count++
                 }

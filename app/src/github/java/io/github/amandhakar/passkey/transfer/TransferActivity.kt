@@ -2,6 +2,7 @@ package io.github.amandhakar.passkey.transfer
 
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
@@ -48,10 +49,12 @@ import io.github.amandhakar.securechannel.Connection
 import io.github.amandhakar.securechannel.Handshake
 import io.github.amandhakar.securechannel.Invite
 import io.github.amandhakar.securechannel.LocalNetwork
+import io.github.amandhakar.securechannel.QrReceiver
 import io.github.amandhakar.securechannel.Suites
 import io.github.amandhakar.securechannel.TcpTransport
 import io.github.amandhakar.securechannel.Transfer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -75,6 +78,9 @@ class TransferActivity : FragmentActivity() {
         data object Idle : Phase
         data class Busy(val what: String) : Phase
         class ShowingQr(val qr: Bitmap, val addresses: List<String>) : Phase
+
+        /** New phone: the passkeys that arrived, waiting for the person to add them or not. */
+        class Confirm(val passkeys: List<String>, val skipped: Int, val answer: CompletableDeferred<Boolean>) : Phase
     }
 
     private class LogLine(val ok: Boolean, val text: String)
@@ -87,6 +93,8 @@ class TransferActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The QR code holds the one-time secret: keep it out of screenshots, screen recordings and Recents.
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         newMovable.value = MovablePasskeys.newPasskeysMovable(this)
         setContent {
@@ -113,6 +121,7 @@ class TransferActivity : FragmentActivity() {
         }
         job?.cancel()
         job = null
+        (phase.value as? Phase.Confirm)?.answer?.complete(false)
         phase.value = Phase.Idle
     }
 
@@ -155,7 +164,7 @@ class TransferActivity : FragmentActivity() {
         val channel = withContext(Dispatchers.IO) { pending.confirm(true) }.tracked()
         note(true, "Connected to the new phone; the QR code's secret checked out")
 
-        if (!verifyUser("Send passkeys", "${movable.size} passkey(s) to your new phone")) {
+        if (!verifyUser("Send passkeys", "${movable.size} passkey(s) to the phone whose QR code you scanned")) {
             throw IllegalStateException("Cancelled")
         }
         phase.value = Phase.Busy("Sending ${movable.size} passkey(s)…")
@@ -179,7 +188,8 @@ class TransferActivity : FragmentActivity() {
         store.markBackedUp(movable.map { it.credentialId }.toSet())
         note(
             true,
-            "Sent ${movable.size} passkey(s). This phone keeps its copies; delete them here once the new phone signs in.",
+            "Sent ${movable.size} passkey(s); the new phone shows them and asks before adding. This phone keeps its " +
+                "copies; delete them here once the new phone signs in.",
         )
     }
 
@@ -192,49 +202,61 @@ class TransferActivity : FragmentActivity() {
         val qr = withContext(Dispatchers.Default) { QrCode.bitmap(Invite(Invite.TCP, targets, secret).encode(QR_PREFIX)) }
         phase.value = Phase.ShowingQr(qr, targets)
 
-        val connection = withContext(Dispatchers.IO) { listener.accept() }.tracked()
+        // Keeps listening past strangers on the network: only a phone with this QR code's secret gets through.
+        val channel = withContext(Dispatchers.IO) {
+            QrReceiver.accept(listener, { id -> Suites.software.firstOrNull { it.id == id } }, secret) { peer, reason ->
+                note(false, "Ignored a connection from $peer (${reason.message ?: reason.javaClass.simpleName})")
+            }
+        }.tracked()
         listener.close() // one old phone per QR code
-        phase.value = Phase.Busy("Connecting…")
-        val pending = withContext(Dispatchers.IO) {
-            Handshake.respond(connection, { id -> Suites.software.firstOrNull { it.id == id } }, secret)
-        }
-        if (!pending.usesQrSecret) {
-            pending.close()
-            throw SecurityException("The other phone didn't use this QR code; nothing received")
-        }
-        val channel = withContext(Dispatchers.IO) { pending.confirm(true) }.tracked()
         phase.value = Phase.Busy("Receiving passkeys…")
-        val received = mutableListOf<ByteArrayOutputStream>()
+        val received = ByteArrayOutputStream()
         withContext(Dispatchers.IO) {
-            Transfer.receiveAll(channel, MAX_PAYLOAD_BYTES, { _, _ -> ByteArrayOutputStream().also { received += it } }) {}
+            // The old phone sends exactly one item, at most MAX_PAYLOAD_BYTES.
+            Transfer.receiveAll(channel, MAX_PAYLOAD_BYTES, { _, _ -> received }, maxItems = 1) {}
         }
-        val (added, skipped) = withContext(Dispatchers.Default) {
-            var added = 0
-            var skipped = 0
-            received.forEach { sink ->
-                val bytes = sink.toByteArray()
-                try {
-                    val (a, s) = addAll(bytes)
-                    added += a
-                    skipped += s
-                } finally {
-                    bytes.fill(0)
+        val bytes = received.toByteArray()
+        var incoming = emptyList<MovingPasskey>()
+        try {
+            incoming = withContext(Dispatchers.Default) { TransferPayload.decode(bytes) }
+            val store = PasskeyStore.get(this)
+            val (new, already) = incoming.partition { moving ->
+                store.all().none {
+                    it.credentialId == moving.passkey.credentialId ||
+                        (it.rpId == moving.passkey.rpId && it.userId == moving.passkey.userId)
                 }
             }
-            added to skipped
+            // The person decides: they see exactly which accounts arrive before anything is added.
+            val answer = CompletableDeferred<Boolean>()
+            phase.value = Phase.Confirm(
+                new.map { "${it.passkey.userName.ifBlank { it.passkey.displayName }} on ${it.passkey.rpId}" },
+                already.size,
+                answer,
+            )
+            if (new.isEmpty() || !answer.await()) {
+                note(true, "Nothing added" + if (already.isNotEmpty()) " (${already.size} already on this phone)" else "")
+                return@session
+            }
+            phase.value = Phase.Busy("Adding passkeys…")
+            val (added, skipped) = withContext(Dispatchers.Default) { addAll(new) }
+            note(
+                true,
+                "Received: $added passkey(s) added" +
+                    (already.size + skipped).let { if (it > 0) ", $it already on this phone (skipped)" else "" },
+            )
+        } finally {
+            // Added, declined or skipped: no private key stays readable in this array.
+            incoming.forEach { it.privateKey.fill(0) }
+            bytes.fill(0)
         }
-        note(
-            true,
-            "Received: $added passkey(s) added" + if (skipped > 0) ", $skipped already on this phone (skipped)" else "",
-        )
     }
 
     /** Adds received passkeys, skipping any this phone already has. Returns (added, skipped). */
-    private fun addAll(bytes: ByteArray): Pair<Int, Int> {
+    private fun addAll(incoming: List<MovingPasskey>): Pair<Int, Int> {
         val store = PasskeyStore.get(this)
         var added = 0
         var skipped = 0
-        TransferPayload.decode(bytes).forEach { moving ->
+        incoming.forEach { moving ->
             val passkey = moving.passkey
             val exists = store.all().any {
                 it.credentialId == passkey.credentialId || (it.rpId == passkey.rpId && it.userId == passkey.userId)
@@ -328,6 +350,20 @@ class TransferActivity : FragmentActivity() {
                     )
                     OutlinedButton(onClick = ::stop) { Text("Cancel") }
                 }
+                is Phase.Confirm -> Section("Add these passkeys?") {
+                    current.passkeys.forEach { Text("• $it") }
+                    if (current.skipped > 0) {
+                        Text("${current.skipped} more already on this phone; they stay as they are.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text(
+                        "Only add them if they came from your own old phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { current.answer.complete(true) }, enabled = current.passkeys.isNotEmpty()) { Text("Add") }
+                        OutlinedButton(onClick = { current.answer.complete(false) }) { Text("Don't add") }
+                    }
+                }
                 is Phase.Busy -> Section(current.what) {
                     OutlinedButton(onClick = ::stop) { Text("Cancel") }
                 }
@@ -336,6 +372,12 @@ class TransferActivity : FragmentActivity() {
                         Text(
                             "$movableCount movable passkey(s) on this phone" +
                                 if (passkeys.size > movableCount) " (${passkeys.size - movableCount} stay here)." else ".",
+                        )
+                        Text(
+                            "Only scan a QR code shown on your own new phone, in front of you. Whoever shows the code " +
+                                "gets the passkeys.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
                         )
                         Button(onClick = ::send, enabled = movableCount > 0) { Text("Scan the new phone's QR code") }
                     }
@@ -360,9 +402,21 @@ class TransferActivity : FragmentActivity() {
         }
     }
 
+    /** Turning "Can be moved" on needs the owner (fingerprint or screen lock); turning it off doesn't. */
     private fun setMovable(movable: Boolean) {
-        MovablePasskeys.setNewPasskeysMovable(this, movable)
-        newMovable.value = movable
+        if (!movable || newMovable.value) {
+            MovablePasskeys.setNewPasskeysMovable(this, movable)
+            newMovable.value = movable
+            return
+        }
+        lifecycleScope.launch {
+            val ok = runCatching { verifyUser("Make new passkeys movable", "They can then be copied to another phone") }
+                .getOrElse { note(false, it.message ?: "Cannot verify"); false }
+            if (ok) {
+                MovablePasskeys.setNewPasskeysMovable(this@TransferActivity, true)
+                newMovable.value = true
+            }
+        }
     }
 
     @Composable
