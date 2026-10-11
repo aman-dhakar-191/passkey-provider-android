@@ -63,6 +63,17 @@ class MovePasskeysTest {
     }
 
     @Test
+    fun `wrapped key records which vault wrapped it, and both versions open`() {
+        val aad = "credential-1".toByteArray()
+        val v2 = KeyWrap.wrap(rsa.public, byteArrayOf(1, 2, 3), aad)
+        assertEquals(KeyWrap.VAULT_V2, KeyWrap.vault(v2))
+        val v1 = KeyWrap.wrap(rsa.public, byteArrayOf(4, 5), aad, vault = KeyWrap.VAULT_V1)
+        assertEquals(KeyWrap.VAULT_V1, KeyWrap.vault(v1))
+        assertArrayEquals(byteArrayOf(4, 5), KeyWrap.unwrap(v1, aad, ::rsaDecrypt))
+        assertThrows(IllegalArgumentException::class.java) { KeyWrap.vault(byteArrayOf(9, 0, 0, 0)) }
+    }
+
+    @Test
     fun `payload round-trips and never carries this phone's wrapped copy`() {
         val pair = p256()
         val id = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" // 32 bytes

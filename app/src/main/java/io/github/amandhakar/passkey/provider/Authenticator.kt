@@ -26,10 +26,17 @@ class Authenticator(context: Context) {
     // "none" attestation carries no signature, so registration never needs the client data hash.
     fun register(options: CreationOptions, rpId: String, origin: String): String {
         val credentialId = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        // GitHub build setting: a movable passkey's key is made so it can later be sent to a new phone.
-        val movable = MovablePasskeys.newPasskeysMovable(context)
-        val (publicKey, wrappedKey) =
-            if (movable) MovablePasskeys.createKey(context, credentialId) else PasskeyKeys.generate(credentialId) to ""
+        // GitHub build setting: a movable passkey's key is made so it can later be sent to a new phone. If that
+        // can't be done (e.g. no fingerprint enrolled any more), the passkey is made phone-only instead.
+        val movableKey = if (MovablePasskeys.newPasskeysMovable(context)) {
+            runCatching { MovablePasskeys.createKey(context, credentialId) }
+                .onFailure { ProviderErrors.note(context, "Couldn't make the passkey movable (${it.javaClass.simpleName}); made it phone-only") }
+                .getOrNull()
+        } else {
+            null
+        }
+        val movable = movableKey != null
+        val (publicKey, wrappedKey) = movableKey ?: (PasskeyKeys.generate(credentialId) to "")
         val cose = WebAuthnEncoding.coseEs256PublicKey(
             WebAuthnEncoding.unsignedFixed(publicKey.w.affineX),
             WebAuthnEncoding.unsignedFixed(publicKey.w.affineY),

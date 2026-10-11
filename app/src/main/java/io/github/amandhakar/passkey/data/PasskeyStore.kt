@@ -118,6 +118,12 @@ class PasskeyStore internal constructor(private val file: File) {
         return true
     }
 
+    /** Replaces a movable passkey's encrypted copy (re-wrapped under a newer vault key). */
+    @Synchronized
+    fun setWrappedKey(credentialId: String, wrappedKey: String) {
+        save(state.value.map { if (it.credentialId == credentialId) it.copy(wrappedKey = wrappedKey) else it })
+    }
+
     @Synchronized
     fun markBackedUp(credentialIds: Set<String>) {
         save(state.value.map { if (it.credentialId in credentialIds) it.copy(backedUp = true) else it })

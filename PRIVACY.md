@@ -94,8 +94,7 @@ another way to sign in to your important accounts.
 
 The version from GitHub has an optional setting, off unless you turn it on, to make new passkeys movable.
 You can then send them from your old phone to your new one: directly between the two phones over your own
-Wi-Fi, encrypted, after you scan a QR code on the new phone and confirm with your fingerprint or screen
-lock. They never go through us or any server.
+Wi-Fi, encrypted, after you scan a QR code on the new phone and confirm with your fingerprint. They never go through us or any server.
 
 ## 10. Your rights
 Under India's Digital Personal Data Protection Act, 2023, the GDPR and similar laws, you can ask to

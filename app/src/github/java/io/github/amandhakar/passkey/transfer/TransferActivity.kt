@@ -42,7 +42,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.provider.ProviderErrors
-import io.github.amandhakar.passkey.provider.verifyUser
+import io.github.amandhakar.passkey.provider.verifyWithFingerprint
 import io.github.amandhakar.passkey.ui.PasskeyTheme
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import io.github.amandhakar.securechannel.Connection
@@ -96,7 +96,7 @@ class TransferActivity : FragmentActivity() {
         // The QR code holds the one-time secret: keep it out of screenshots, screen recordings and Recents.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
-        newMovable.value = MovablePasskeys.newPasskeysMovable(this)
+        newMovable.value = MovablePasskeys.newPasskeysMovableSetting(this)
         setContent {
             PasskeyTheme {
                 Surface(Modifier.fillMaxSize()) { Screen() }
@@ -151,6 +151,10 @@ class TransferActivity : FragmentActivity() {
     private fun send() = session {
         val store = PasskeyStore.get(this)
         val movable = store.all().filter { it.movable && it.wrappedKey.isNotEmpty() }
+        if (!MovablePasskeys.fingerprintReady(this)) {
+            note(false, "Sending passkeys needs a fingerprint; the screen lock alone isn't enough. Set one up in Settings.")
+            return@session
+        }
         if (movable.isEmpty()) {
             note(false, "No movable passkeys on this phone. Passkeys made before you chose \"Can be moved\" stay here.")
             return@session
@@ -164,7 +168,8 @@ class TransferActivity : FragmentActivity() {
         val channel = withContext(Dispatchers.IO) { pending.confirm(true) }.tracked()
         note(true, "Connected to the new phone; the QR code's secret checked out")
 
-        if (!verifyUser("Send passkeys", "${movable.size} passkey(s) to the phone whose QR code you scanned")) {
+        // Fingerprint only: someone who saw the PIN typed must not be able to copy passkeys away.
+        if (!verifyWithFingerprint("Send passkeys", "${movable.size} passkey(s) to the phone whose QR code you scanned")) {
             throw IllegalStateException("Cancelled")
         }
         phase.value = Phase.Busy("Sending ${movable.size} passkey(s)…")
@@ -173,7 +178,7 @@ class TransferActivity : FragmentActivity() {
                 movable.map { passkey ->
                     val id = Base64Url.decode(passkey.credentialId)
                     val publicKey = PasskeyKeys.publicKey(id) ?: throw IllegalStateException("A passkey's key is missing")
-                    MovingPasskey(passkey, publicKey.encoded, MovablePasskeys.privateKey(passkey))
+                    MovingPasskey(passkey, publicKey.encoded, MovablePasskeys.privateKey(this@TransferActivity, passkey))
                 },
             )
         }
@@ -195,6 +200,10 @@ class TransferActivity : FragmentActivity() {
 
     /** New phone: show the QR code, receive one old phone's passkeys, add them. */
     private fun receive() = session {
+        // The received copies go under the fingerprint-only vault, which needs a fingerprint enrolled.
+        if (!MovablePasskeys.fingerprintReady(this)) {
+            throw IllegalStateException("Receiving passkeys needs a fingerprint on this phone. Set one up in Settings first.")
+        }
         val listener = withContext(Dispatchers.IO) { TcpTransport.TcpListener(port = 0) }.tracked()
         val targets = LocalNetwork.inviteTargets(listener.port)
         if (targets.isEmpty()) throw IOException("No Wi-Fi address. Connect both phones to the same Wi-Fi or hotspot.")
@@ -327,8 +336,9 @@ class TransferActivity : FragmentActivity() {
                     selected = newMovable.value,
                     title = "Can be moved to a new phone",
                     detail = "The key is made in the app and locked into the secure hardware, with an encrypted copy " +
-                        "that only opens with your fingerprint or screen lock, for moving it. Sites can see that it " +
-                        "can be backed up.",
+                        "for moving it that opens only with your fingerprint, never the PIN. Needs a fingerprint; " +
+                        "adding or removing a fingerprint later stops earlier passkeys from moving (they still " +
+                        "sign in). Sites can see that it can be backed up.",
                 ) { setMovable(true) }
                 Text(
                     "Only affects passkeys made from now on. Existing passkeys keep how they were made.",
@@ -402,15 +412,19 @@ class TransferActivity : FragmentActivity() {
         }
     }
 
-    /** Turning "Can be moved" on needs the owner (fingerprint or screen lock); turning it off doesn't. */
+    /** Turning "Can be moved" on needs the owner's fingerprint; turning it off doesn't. */
     private fun setMovable(movable: Boolean) {
         if (!movable || newMovable.value) {
             MovablePasskeys.setNewPasskeysMovable(this, movable)
             newMovable.value = movable
             return
         }
+        if (!MovablePasskeys.fingerprintReady(this)) {
+            note(false, "Movable passkeys need a fingerprint; the screen lock alone isn't enough. Set one up in Settings.")
+            return
+        }
         lifecycleScope.launch {
-            val ok = runCatching { verifyUser("Make new passkeys movable", "They can then be copied to another phone") }
+            val ok = runCatching { verifyWithFingerprint("Make new passkeys movable", "They can then be copied to another phone") }
                 .getOrElse { note(false, it.message ?: "Cannot verify"); false }
             if (ok) {
                 MovablePasskeys.setNewPasskeysMovable(this@TransferActivity, true)

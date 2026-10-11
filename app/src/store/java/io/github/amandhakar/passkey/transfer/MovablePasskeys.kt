@@ -16,4 +16,6 @@ object MovablePasskeys {
         throw UnsupportedOperationException("Movable passkeys are not in this build")
 
     fun open(context: Context) = Unit
+
+    fun upgradeQuietly(context: Context) = 0
 }

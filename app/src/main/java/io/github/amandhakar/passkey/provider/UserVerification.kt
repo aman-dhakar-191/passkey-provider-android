@@ -21,7 +21,19 @@ suspend fun FragmentActivity.verifyUser(title: String, subtitle: String): Boolea
 suspend fun FragmentActivity.verifyUserFor(signer: Signature, title: String, subtitle: String): Signature? =
     if (prompt(title, subtitle, BiometricPrompt.CryptoObject(signer))) signer else null
 
-private suspend fun FragmentActivity.prompt(title: String, subtitle: String, crypto: BiometricPrompt.CryptoObject?): Boolean {
+/**
+ * Fingerprint (or another strong biometric) only, no PIN/pattern/password: for actions a thief who has
+ * watched the screen lock being typed must not be able to do, such as copying passkeys to another phone.
+ */
+suspend fun FragmentActivity.verifyWithFingerprint(title: String, subtitle: String): Boolean =
+    prompt(title, subtitle, crypto = null, authenticators = BIOMETRIC_STRONG)
+
+private suspend fun FragmentActivity.prompt(
+    title: String,
+    subtitle: String,
+    crypto: BiometricPrompt.CryptoObject?,
+    authenticators: Int = BIOMETRIC_STRONG or DEVICE_CREDENTIAL,
+): Boolean {
     val keyguard = getSystemService(KeyguardManager::class.java)
     if (!keyguard.isDeviceSecure) {
         throw IllegalStateException("Set up a screen lock (PIN, pattern, password or biometrics) to use passkeys")
@@ -45,7 +57,9 @@ private suspend fun FragmentActivity.prompt(title: String, subtitle: String, cry
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
             .setSubtitle(subtitle)
-            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
+            .setAllowedAuthenticators(authenticators)
+            // Without the screen-lock option the prompt needs its own way out.
+            .apply { if (authenticators and DEVICE_CREDENTIAL == 0) setNegativeButtonText("Cancel") }
             .build()
         if (crypto == null) prompt.authenticate(info) else prompt.authenticate(info, crypto)
         cont.invokeOnCancellation { prompt.cancelAuthentication() }
