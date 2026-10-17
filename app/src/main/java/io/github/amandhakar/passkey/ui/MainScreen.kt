@@ -92,6 +92,7 @@ fun MainScreen(
     onClearProblems: () -> Unit,
     /** GitHub build: moving passkeys to a new phone; null where the build doesn't have it. */
     onMovePasskeys: (() -> Unit)? = null,
+    onBackup: (() -> Unit)? = null,
 ) {
     val passkeys by passkeysFlow.collectAsState()
     val log by problemsFlow.collectAsState()
@@ -124,6 +125,12 @@ fun MainScreen(
                             DropdownMenuItem(
                                 text = { Text("Move passkeys") },
                                 onClick = { menuOpen = false; onMovePasskeys() },
+                            )
+                        }
+                        if (onBackup != null) {
+                            DropdownMenuItem(
+                                text = { Text("Backup & recovery") },
+                                onClick = { menuOpen = false; onBackup() },
                             )
                         }
                         DropdownMenuItem(
@@ -257,8 +264,9 @@ fun MainScreen(
                     Text(
                         if (onMovePasskeys != null) {
                             "Passkeys made as \"Can be moved\" (⋮ → Move passkeys) can be sent to a new phone while you " +
-                                "still have the old one. All others live only on this phone and can't be copied. " +
-                                "A few minutes now saves you from being locked out later."
+                                "still have the old one, and backed up (⋮ → Backup & recovery) for when you don't. All " +
+                                "others live only on this phone and can't be copied. A few minutes now saves you from " +
+                                "being locked out later."
                         } else {
                             "Your passkeys live only on this phone and can't be copied to another one. " +
                                 "A few minutes now saves you from being locked out later."
@@ -317,8 +325,8 @@ fun MainScreen(
                     Text(
                         if (onMovePasskeys != null) {
                             "Sign in with your fingerprint instead of a password. Your keys stay on this phone and " +
-                                "aren't backed up, unless you make passkeys movable and move them to another phone " +
-                                "yourself. Keep another way to sign in to important accounts."
+                                "aren't backed up, unless you make passkeys movable and move or back them up yourself. " +
+                                "Keep another way to sign in to important accounts."
                         } else {
                             "Sign in with your fingerprint instead of a password. Your keys never leave this phone " +
                                 "and aren't backed up, so keep another way to sign in to important accounts."

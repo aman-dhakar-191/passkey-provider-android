@@ -74,6 +74,7 @@ class MainActivity : FragmentActivity() {
                     onCopyProblems = ::copyProblems,
                     onClearProblems = { ProviderErrors.clear(this) },
                     onMovePasskeys = if (MovablePasskeys.ENABLED) ({ MovablePasskeys.open(this) }) else null,
+                    onBackup = if (MovablePasskeys.ENABLED) ({ MovablePasskeys.openBackup(this) }) else null,
                 )
             }
         }

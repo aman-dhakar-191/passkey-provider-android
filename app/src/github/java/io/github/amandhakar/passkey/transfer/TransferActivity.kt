@@ -39,12 +39,10 @@ import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
-import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.provider.verifyWithFingerprint
 import io.github.amandhakar.passkey.ui.PasskeyTheme
-import io.github.amandhakar.passkey.webauthn.Base64Url
 import io.github.amandhakar.securechannel.Connection
 import io.github.amandhakar.securechannel.Handshake
 import io.github.amandhakar.securechannel.Invite
@@ -173,15 +171,7 @@ class TransferActivity : FragmentActivity() {
             throw IllegalStateException("Cancelled")
         }
         phase.value = Phase.Busy("Sending ${movable.size} passkey(s)…")
-        val payload = withContext(Dispatchers.Default) {
-            TransferPayload.encode(
-                movable.map { passkey ->
-                    val id = Base64Url.decode(passkey.credentialId)
-                    val publicKey = PasskeyKeys.publicKey(id) ?: throw IllegalStateException("A passkey's key is missing")
-                    MovingPasskey(passkey, publicKey.encoded, MovablePasskeys.privateKey(this@TransferActivity, passkey))
-                },
-            )
-        }
+        val payload = withContext(Dispatchers.Default) { PasskeyBundle.encode(this@TransferActivity, movable) }
         try {
             withContext(Dispatchers.IO) {
                 Transfer.send(channel, "passkeys.json", payload.size.toLong(), payload.inputStream())
@@ -228,17 +218,11 @@ class TransferActivity : FragmentActivity() {
         var incoming = emptyList<MovingPasskey>()
         try {
             incoming = withContext(Dispatchers.Default) { TransferPayload.decode(bytes) }
-            val store = PasskeyStore.get(this)
-            val (new, already) = incoming.partition { moving ->
-                store.all().none {
-                    it.credentialId == moving.passkey.credentialId ||
-                        (it.rpId == moving.passkey.rpId && it.userId == moving.passkey.userId)
-                }
-            }
+            val (new, already) = PasskeyBundle.partition(this, incoming)
             // The person decides: they see exactly which accounts arrive before anything is added.
             val answer = CompletableDeferred<Boolean>()
             phase.value = Phase.Confirm(
-                new.map { "${it.passkey.userName.ifBlank { it.passkey.displayName }} on ${it.passkey.rpId}" },
+                PasskeyBundle.describe(new),
                 already.size,
                 answer,
             )
@@ -247,7 +231,7 @@ class TransferActivity : FragmentActivity() {
                 return@session
             }
             phase.value = Phase.Busy("Adding passkeys…")
-            val (added, skipped) = withContext(Dispatchers.Default) { addAll(new) }
+            val (added, skipped) = withContext(Dispatchers.Default) { PasskeyBundle.addAll(this@TransferActivity, new) }
             note(
                 true,
                 "Received: $added passkey(s) added" +
@@ -258,34 +242,6 @@ class TransferActivity : FragmentActivity() {
             incoming.forEach { it.privateKey.fill(0) }
             bytes.fill(0)
         }
-    }
-
-    /** Adds received passkeys, skipping any this phone already has. Returns (added, skipped). */
-    private fun addAll(incoming: List<MovingPasskey>): Pair<Int, Int> {
-        val store = PasskeyStore.get(this)
-        var added = 0
-        var skipped = 0
-        incoming.forEach { moving ->
-            val passkey = moving.passkey
-            val exists = store.all().any {
-                it.credentialId == passkey.credentialId || (it.rpId == passkey.rpId && it.userId == passkey.userId)
-            }
-            if (exists) {
-                skipped++
-                return@forEach
-            }
-            val (publicKey, privateKey) = TransferPayload.keyPair(moving)
-            val id = Base64Url.decode(passkey.credentialId)
-            val wrapped = MovablePasskeys.importKey(id, publicKey, privateKey)
-            moving.privateKey.fill(0)
-            if (store.addIfAbsent(passkey.copy(movable = true, backedUp = true, wrappedKey = wrapped))) {
-                added++
-            } else {
-                PasskeyKeys.delete(id)
-                skipped++
-            }
-        }
-        return added to skipped
     }
 
     /** The QR code lists every Wi-Fi/hotspot address of the new phone; use the first that answers. */
