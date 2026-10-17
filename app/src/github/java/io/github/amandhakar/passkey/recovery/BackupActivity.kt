@@ -13,7 +13,6 @@ import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
-import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -124,8 +123,9 @@ class BackupActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // QR codes here carry one-time secrets: keep them out of screenshots, recordings and Recents.
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        // Screenshots are allowed here (GitHub build, for testing and bug reports), like the rest of this build;
+        // the store build blocks them app-wide (BuildConfig.BLOCK_SCREENSHOTS). The QR codes' one-time secrets
+        // only work while this screen shows them; a key piece is only on screen while someone types a card in.
         enableEdgeToEdge()
         if (store.set.value != null) BackupReminderWorker.schedule(this)
         setContent {
