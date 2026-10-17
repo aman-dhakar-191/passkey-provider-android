@@ -49,15 +49,18 @@ internal data class BackupSet(
     val keepers: List<Keeper> = emptyList(),
     val file: SavedFile? = null,
     val lastReminderAt: Long = 0,
+    /** Piece numbers ever handed out, including removed keepers': never reused, so no two keepers share a piece. */
+    val usedX: Set<Int> = emptySet(),
 ) {
     override fun equals(other: Any?) = other is BackupSet && other.setId.contentEquals(setId) &&
         other.createdAt == createdAt && other.ownerPoints == ownerPoints && other.keepers == keepers &&
-        other.file == file && other.lastReminderAt == lastReminderAt
+        other.file == file && other.lastReminderAt == lastReminderAt && other.usedX == usedX
 
     override fun hashCode() = setId.contentHashCode()
 
-    /** The next unused piece number (1..254). */
-    fun nextX(): Int = (1..RecoveryShare.MAX_X).first { x -> keepers.none { it.x == x } }
+    /** The next piece number (1..254) never handed out before. */
+    fun nextX(): Int = (1..RecoveryShare.MAX_X).firstOrNull { x -> x !in usedX && keepers.none { it.x == x } }
+        ?: throw IllegalStateException("No piece numbers left: use Start over")
 }
 
 /**

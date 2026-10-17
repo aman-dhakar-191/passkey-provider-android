@@ -17,6 +17,7 @@ class BackupSetJsonTest {
         ),
         file = SavedFile("content://drive/1", "hash", 40, setOf("b", "a"), lastOkAt = 50),
         lastReminderAt = 60,
+        usedX = setOf(1, 2, 5),
     )
 
     @Test

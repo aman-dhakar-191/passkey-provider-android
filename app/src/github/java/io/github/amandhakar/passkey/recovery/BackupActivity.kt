@@ -278,7 +278,11 @@ class BackupActivity : FragmentActivity() {
     private fun addKeeper(kind: KeeperKind, label: String, share: RecoveryShare, okNow: Boolean) {
         val time = now()
         store.update { set ->
-            set?.copy(keepers = set.keepers.filterNot { it.x == share.x } + Keeper(share.x, kind, label.take(BackupSetJson.LABEL_MAX), share.checkKey(), time, lastOkAt = if (okNow) time else 0))
+            set?.copy(
+                keepers = set.keepers.filterNot { it.x == share.x } +
+                    Keeper(share.x, kind, label.take(BackupSetJson.LABEL_MAX), share.checkKey(), time, lastOkAt = if (okNow) time else 0),
+                usedX = set.usedX + share.x,
+            )
         }
     }
 
@@ -730,6 +734,7 @@ class BackupActivity : FragmentActivity() {
                 createdAt = time,
                 ownerPoints = wrapped,
                 keepers = list,
+                usedX = list.map { it.x }.toSet(),
                 // Recorded so the file can be checked; "Back up now" saves a fresh one.
                 file = SavedFile(uri.toString(), sha256(file), time, emptySet(), lastOkAt = time),
             )

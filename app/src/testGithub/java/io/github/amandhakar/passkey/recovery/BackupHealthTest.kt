@@ -69,5 +69,7 @@ class BackupHealthTest {
         assertEquals(1, set(emptyList()).nextX())
         assertEquals(3, set(listOf(keeper(1), keeper(2))).nextX())
         assertEquals(2, set(listOf(keeper(1), keeper(3))).nextX())
+        // A removed keeper's number isn't handed out again.
+        assertEquals(4, set(listOf(keeper(1))).copy(usedX = setOf(1, 2, 3)).nextX())
     }
 }

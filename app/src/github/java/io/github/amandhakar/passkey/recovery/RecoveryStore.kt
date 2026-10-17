@@ -23,6 +23,7 @@ internal object BackupSetJson {
         .put("createdAt", set.createdAt)
         .put("ownerPoints", set.ownerPoints)
         .put("lastReminderAt", set.lastReminderAt)
+        .put("usedX", JSONArray(set.usedX.sorted()))
         .put(
             "keepers",
             JSONArray().apply {
@@ -55,6 +56,7 @@ internal object BackupSetJson {
             createdAt = o.getLong("createdAt"),
             ownerPoints = o.getString("ownerPoints"),
             lastReminderAt = o.optLong("lastReminderAt"),
+            usedX = o.optJSONArray("usedX")?.let { a -> (0 until a.length()).map { a.getInt(it) }.toSet() } ?: emptySet(),
             keepers = (0 until keepers.length()).map { i ->
                 val k = keepers.getJSONObject(i)
                 Keeper(
