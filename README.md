@@ -22,6 +22,7 @@ Requires **Android 14 (API 34) or newer**, with a screen lock set up.
 | WebAuthn authenticator (authenticator data, "none" attestation, ES256 signatures) | `provider/Authenticator.kt`, `webauthn/` |
 | Private keys (Android Keystore / StrongBox; they never leave the device, except movable passkeys below) | `crypto/PasskeyKeys.kt` |
 | Moving passkeys to a new phone (GitHub build only, opt-in) | `app/src/github/.../transfer/`, `securechannel/` |
+| Backup & recovery with keepers (GitHub build only) | `app/src/github/.../recovery/` |
 | Self-update from GitHub Releases (GitHub build only) | `app/src/github/.../update/` |
 
 **Desktop sign-in via QR code:** the QR code starts the FIDO *hybrid* protocol, which checks that
@@ -67,12 +68,12 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
   key briefly exists outside the Keystore when it's made, sent or received, and copies can exist on
   two phones. Sites see these passkeys as "backup eligible" (and "backed up" once moved). Passkeys
   made before the setting was on, and all passkeys in the store build, stay on their phone.
-  **Encrypted backup (GitHub build, movable passkeys only):** *⋮ → Move passkeys → Back up to a file* saves them
-  into one encrypted file wherever you choose with Android's file picker (Google Drive, another cloud app, or
-  local storage). It needs a fingerprint, and the file opens only with a random 256-bit **recovery key** shown
-  once when you make it: lose the key and nobody can open the backup, including the app; keep the key apart
-  from the file, because whoever has both can restore your passkeys. *Restore from a backup* does the reverse
-  on this phone or a new one. The app itself uses no network for any of this.
+  **Backup & recovery (GitHub build, movable passkeys only):** *⋮ → Backup & recovery* saves them into one
+  encrypted file wherever you choose (Google Drive, another cloud app, the phone). Nobody has to remember a
+  key: the file's key is split into pieces for **keepers** (Google, a printed card, someone you trust or your
+  own spare phone), and any two pieces restore it, while one alone opens nothing. The app checks now and
+  then that every keeper still has its piece and reminds you when a check is due, so a lost piece shows up
+  before you need it. You can also keep a piece for someone else.
   Threats and what protects against each: [docs/MOVING-PASSKEYS-SECURITY.md](docs/MOVING-PASSKEYS-SECURITY.md).
 
 ## Building

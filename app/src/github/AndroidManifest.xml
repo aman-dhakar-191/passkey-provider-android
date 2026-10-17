@@ -16,5 +16,12 @@
             android:name="io.github.amandhakar.passkey.transfer.TransferActivity"
             android:exported="false"
             android:label="Move passkeys" />
+
+        <!-- Backup & recovery (src/github/java/.../recovery). Opened only from the app's menu and its own
+             reminder notification. -->
+        <activity
+            android:name="io.github.amandhakar.passkey.recovery.BackupActivity"
+            android:exported="false"
+            android:label="Backup &amp; recovery" />
     </application>
 </manifest>

@@ -68,6 +68,22 @@ object MovablePasskeys {
         context.startActivity(Intent(context, TransferActivity::class.java))
     }
 
+    /** Backup & recovery: the encrypted backup file and the keepers of its key (GitHub build). */
+    fun openBackup(context: Context) {
+        context.startActivity(Intent(context, io.github.amandhakar.passkey.recovery.BackupActivity::class.java))
+    }
+
+    /**
+     * Encrypts [secret] for storage on this phone under the fingerprint-only vault, like a movable passkey's
+     * copy. Needs no prompt. [associatedData] binds it to what it belongs to.
+     */
+    internal fun wrapSecret(secret: ByteArray, associatedData: ByteArray): String =
+        Base64Url.encode(KeyWrap.wrap(vaultPublicKey(), secret, associatedData))
+
+    /** Opens what [wrapSecret] made. Call within 30 s of a successful fingerprint prompt. */
+    internal fun unwrapSecret(wrapped: String, associatedData: ByteArray): ByteArray =
+        unwrap(Base64Url.decode(wrapped), associatedData, VAULT_V2_ALIAS)
+
     /** Makes a movable passkey's key: imported into the Keystore, plus its wrapped copy (base64url). */
     @Suppress("UNUSED_PARAMETER")
     fun createKey(context: Context, credentialId: ByteArray): Pair<ECPublicKey, String> {
@@ -110,7 +126,7 @@ object MovablePasskeys {
         require(passkey.movable && passkey.wrappedKey.isNotEmpty()) { "This passkey stays on this phone" }
         val blob = Base64Url.decode(passkey.wrappedKey)
         val vault = KeyWrap.vault(blob)
-        val pkcs8 = unwrap(blob, passkey.credentialId, if (vault == KeyWrap.VAULT_V1) VAULT_V1_ALIAS else VAULT_V2_ALIAS)
+        val pkcs8 = unwrap(blob, Base64Url.decode(passkey.credentialId), if (vault == KeyWrap.VAULT_V1) VAULT_V1_ALIAS else VAULT_V2_ALIAS)
         if (vault == KeyWrap.VAULT_V1) rewrap(context, passkey, pkcs8)
         return pkcs8
     }
@@ -126,7 +142,7 @@ object MovablePasskeys {
         if (old.isEmpty() || !fingerprintReady(context)) return old.size
         var left = old.size
         for (passkey in old) {
-            val pkcs8 = runCatching { unwrap(Base64Url.decode(passkey.wrappedKey), passkey.credentialId, VAULT_V1_ALIAS) }
+            val pkcs8 = runCatching { unwrap(Base64Url.decode(passkey.wrappedKey), Base64Url.decode(passkey.credentialId), VAULT_V1_ALIAS) }
                 .getOrNull() ?: return left // not unlocked recently: try again another time
             try {
                 rewrap(context, passkey, pkcs8)
@@ -147,10 +163,10 @@ object MovablePasskeys {
         PasskeyStore.get(context).setWrappedKey(passkey.credentialId, Base64Url.encode(wrapped))
     }
 
-    private fun unwrap(blob: ByteArray, credentialId: String, alias: String): ByteArray {
+    private fun unwrap(blob: ByteArray, associatedData: ByteArray, alias: String): ByteArray {
         val vault = keyStore().getKey(alias, null) as? PrivateKey
             ?: throw IllegalStateException("The key that protects movable passkeys is missing")
-        return KeyWrap.unwrap(blob, Base64Url.decode(credentialId)) { rsa ->
+        return KeyWrap.unwrap(blob, associatedData) { rsa ->
             try {
                 Cipher.getInstance(KeyWrap.RSA_TRANSFORMATION).run {
                     init(Cipher.DECRYPT_MODE, vault, KeyWrap.OAEP)

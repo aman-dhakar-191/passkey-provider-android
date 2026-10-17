@@ -25,7 +25,8 @@ internal object TransferPayload {
     private const val VERSION = 1
     private val P256_ORDER = BigInteger("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", 16)
 
-    fun encode(passkeys: List<MovingPasskey>): ByteArray {
+    /** [recovery] (backup files only) says which keepers hold pieces of the backup's key; no secrets. */
+    fun encode(passkeys: List<MovingPasskey>, recovery: JSONObject? = null): ByteArray {
         val list = JSONArray()
         passkeys.forEach { moving ->
             list.put(
@@ -37,8 +38,13 @@ internal object TransferPayload {
             )
         }
         return JSONObject().put("format", FORMAT).put("version", VERSION).put("passkeys", list)
+            .apply { if (recovery != null) put("recovery", recovery) }
             .toString().toByteArray(Charsets.UTF_8)
     }
+
+    /** The backup's keeper list stored by [encode], or null. */
+    fun recovery(bytes: ByteArray): JSONObject? =
+        runCatching { JSONObject(String(bytes, Charsets.UTF_8)).optJSONObject("recovery") }.getOrNull()
 
     /** Parses and checks a received document; throws IllegalArgumentException if anything is off. */
     fun decode(bytes: ByteArray): List<MovingPasskey> {

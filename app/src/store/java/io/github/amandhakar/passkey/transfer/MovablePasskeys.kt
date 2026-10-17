@@ -17,5 +17,7 @@ object MovablePasskeys {
 
     fun open(context: Context) = Unit
 
+    fun openBackup(context: Context) = Unit
+
     fun upgradeQuietly(context: Context) = 0
 }

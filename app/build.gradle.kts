@@ -136,6 +136,8 @@ dependencies {
     // Moving passkeys to a new phone: the secure channel (shared with Crypto Lab) and drawing the QR code.
     "githubImplementation"(project(":securechannel"))
     "githubImplementation"(libs.zxing.core)
+    // Backup & recovery: one piece of the backup's key kept by Google, end-to-end encrypted with the screen lock.
+    "githubImplementation"(libs.play.services.auth.blockstore)
     implementation(libs.play.services.code.scanner)
     implementation(libs.kotlinx.coroutines.android)
 

@@ -1,16 +1,10 @@
 package io.github.amandhakar.passkey.transfer
 
-import android.content.ClipData
-import android.content.ClipDescription
-import android.content.ClipboardManager
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,13 +16,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,26 +29,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
-import io.github.amandhakar.passkey.crypto.PasskeyKeys
-import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.data.PasskeyStore
 import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.provider.verifyWithFingerprint
 import io.github.amandhakar.passkey.ui.PasskeyTheme
-import io.github.amandhakar.passkey.webauthn.Base64Url
 import io.github.amandhakar.securechannel.Connection
 import io.github.amandhakar.securechannel.Handshake
 import io.github.amandhakar.securechannel.Invite
@@ -92,18 +78,7 @@ class TransferActivity : FragmentActivity() {
         class ShowingQr(val qr: Bitmap, val addresses: List<String>) : Phase
 
         /** New phone: the passkeys that arrived, waiting for the person to add them or not. */
-        class Confirm(
-            val passkeys: List<String>,
-            val skipped: Int,
-            val answer: CompletableDeferred<Boolean>,
-            val hint: String,
-        ) : Phase
-
-        /** Backup: the recovery key, shown once. The file is written only after the person says they saved it. */
-        class ShowKey(val text: String, val answer: CompletableDeferred<Boolean>) : Phase
-
-        /** Restore: waiting for the recovery key to be typed or pasted (null = cancelled). */
-        class AskKey(val answer: CompletableDeferred<String?>) : Phase
+        class Confirm(val passkeys: List<String>, val skipped: Int, val answer: CompletableDeferred<Boolean>) : Phase
     }
 
     private class LogLine(val ok: Boolean, val text: String)
@@ -113,19 +88,6 @@ class TransferActivity : FragmentActivity() {
     private val newMovable = mutableStateOf(false)
     private var job: Job? = null
     private val open = mutableListOf<Closeable>()
-
-    // The system file picker, so the person chooses where a backup goes (Google Drive, another cloud app, local
-    // storage): this app needs no storage permission, no Google account and no network for it.
-    private var picked: CompletableDeferred<Uri?>? = null
-    private val createFile = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { picked?.complete(it) }
-    private val openFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { picked?.complete(it) }
-
-    private suspend fun pick(launch: () -> Unit): Uri? {
-        val result = CompletableDeferred<Uri?>()
-        picked = result
-        launch()
-        return result.await()
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,9 +120,6 @@ class TransferActivity : FragmentActivity() {
         job?.cancel()
         job = null
         (phase.value as? Phase.Confirm)?.answer?.complete(false)
-        (phase.value as? Phase.ShowKey)?.answer?.complete(false)
-        (phase.value as? Phase.AskKey)?.answer?.complete(null)
-        picked?.complete(null)
         phase.value = Phase.Idle
     }
 
@@ -212,7 +171,7 @@ class TransferActivity : FragmentActivity() {
             throw IllegalStateException("Cancelled")
         }
         phase.value = Phase.Busy("Sending ${movable.size} passkey(s)…")
-        val payload = withContext(Dispatchers.Default) { encodeMovable(movable) }
+        val payload = withContext(Dispatchers.Default) { PasskeyBundle.encode(this@TransferActivity, movable) }
         try {
             withContext(Dispatchers.IO) {
                 Transfer.send(channel, "passkeys.json", payload.size.toLong(), payload.inputStream())
@@ -255,38 +214,24 @@ class TransferActivity : FragmentActivity() {
             // The old phone sends exactly one item, at most MAX_PAYLOAD_BYTES.
             Transfer.receiveAll(channel, MAX_PAYLOAD_BYTES, { _, _ -> received }, maxItems = 1) {}
         }
-        importPayload(received.toByteArray(), "Only add them if they came from your own old phone.")
-    }
-
-    /**
-     * Checks a payload that arrived (from the old phone or out of a backup), shows which accounts it holds, and
-     * adds the new ones if the person says so. Wipes the bytes and every private key before returning.
-     */
-    private suspend fun importPayload(bytes: ByteArray, hint: String) {
+        val bytes = received.toByteArray()
         var incoming = emptyList<MovingPasskey>()
         try {
             incoming = withContext(Dispatchers.Default) { TransferPayload.decode(bytes) }
-            val store = PasskeyStore.get(this)
-            val (new, already) = incoming.partition { moving ->
-                store.all().none {
-                    it.credentialId == moving.passkey.credentialId ||
-                        (it.rpId == moving.passkey.rpId && it.userId == moving.passkey.userId)
-                }
-            }
+            val (new, already) = PasskeyBundle.partition(this, incoming)
             // The person decides: they see exactly which accounts arrive before anything is added.
             val answer = CompletableDeferred<Boolean>()
             phase.value = Phase.Confirm(
-                new.map { "${it.passkey.userName.ifBlank { it.passkey.displayName }} on ${it.passkey.rpId}" },
+                PasskeyBundle.describe(new),
                 already.size,
                 answer,
-                hint,
             )
             if (new.isEmpty() || !answer.await()) {
                 note(true, "Nothing added" + if (already.isNotEmpty()) " (${already.size} already on this phone)" else "")
-                return
+                return@session
             }
             phase.value = Phase.Busy("Adding passkeys…")
-            val (added, skipped) = withContext(Dispatchers.Default) { addAll(new) }
+            val (added, skipped) = withContext(Dispatchers.Default) { PasskeyBundle.addAll(this@TransferActivity, new) }
             note(
                 true,
                 "Received: $added passkey(s) added" +
@@ -297,136 +242,6 @@ class TransferActivity : FragmentActivity() {
             incoming.forEach { it.privateKey.fill(0) }
             bytes.fill(0)
         }
-    }
-
-    /** The movable passkeys with their private keys, as a [TransferPayload]. Call within 30 s of a fingerprint check. */
-    private fun encodeMovable(movable: List<Passkey>): ByteArray =
-        TransferPayload.encode(
-            movable.map { passkey ->
-                val id = Base64Url.decode(passkey.credentialId)
-                val publicKey = PasskeyKeys.publicKey(id) ?: throw IllegalStateException("A passkey's key is missing")
-                MovingPasskey(passkey, publicKey.encoded, MovablePasskeys.privateKey(this@TransferActivity, passkey))
-            },
-        )
-
-    /**
-     * Writes an encrypted backup of the movable passkeys. The recovery key is shown first, and the file is
-     * written (where the person chooses) only after they confirm they saved it.
-     */
-    private fun backup() = session {
-        val store = PasskeyStore.get(this)
-        val movable = store.all().filter { it.movable && it.wrappedKey.isNotEmpty() }
-        if (!MovablePasskeys.fingerprintReady(this)) {
-            note(false, "Backing up passkeys needs a fingerprint; the screen lock alone isn't enough. Set one up in Settings.")
-            return@session
-        }
-        if (movable.isEmpty()) {
-            note(false, "No movable passkeys on this phone. Passkeys made before you chose \"Can be moved\" stay here.")
-            return@session
-        }
-        phase.value = Phase.Busy("Confirm with your fingerprint")
-        if (!verifyWithFingerprint("Back up passkeys", "${movable.size} passkey(s) into an encrypted file")) {
-            throw IllegalStateException("Cancelled")
-        }
-        phase.value = Phase.Busy("Encrypting ${movable.size} passkey(s)…")
-        val key = BackupFile.newRecoveryKey()
-        val file = withContext(Dispatchers.Default) {
-            val payload = encodeMovable(movable)
-            try {
-                BackupFile.seal(payload, key)
-            } finally {
-                payload.fill(0)
-            }
-        }
-        val recoveryText = BackupFile.recoveryText(key)
-        key.fill(0)
-
-        val saved = CompletableDeferred<Boolean>()
-        phase.value = Phase.ShowKey(recoveryText, saved)
-        if (!saved.await()) {
-            note(true, "Backup cancelled; no file was written")
-            return@session
-        }
-        phase.value = Phase.Busy("Choose where to save the backup")
-        val uri = pick { createFile.launch("passkey-vault-backup-${java.time.LocalDate.now()}.pvbackup") }
-        if (uri == null) {
-            note(true, "Backup cancelled; no file was written")
-            return@session
-        }
-        withContext(Dispatchers.IO) {
-            val out = contentResolver.openOutputStream(uri, "wt") ?: throw IOException("Couldn't write to that location")
-            out.use { it.write(file) }
-        }
-        store.markBackedUp(movable.map { it.credentialId }.toSet())
-        note(
-            true,
-            "Saved an encrypted backup of ${movable.size} passkey(s). It opens only with the recovery key you were " +
-                "shown; without that key nobody can read it, including this app.",
-        )
-    }
-
-    /** Reads a backup file, asks for its recovery key, and offers to add the passkeys inside. */
-    private fun restore() = session {
-        // The restored copies go under the fingerprint-only vault, which needs a fingerprint enrolled.
-        if (!MovablePasskeys.fingerprintReady(this)) {
-            throw IllegalStateException("Restoring passkeys needs a fingerprint on this phone. Set one up in Settings first.")
-        }
-        phase.value = Phase.Busy("Choose the backup file")
-        val uri = pick { openFile.launch(arrayOf("*/*")) }
-        if (uri == null) {
-            note(true, "Nothing chosen")
-            return@session
-        }
-        val file = withContext(Dispatchers.IO) {
-            // One byte more than the biggest real backup, so an oversized file is refused without reading it all.
-            val input = contentResolver.openInputStream(uri) ?: throw IOException("Couldn't read that file")
-            input.use { it.readNBytes(BackupFile.MAX_FILE_BYTES.toInt() + 1) }
-        }
-        val asked = CompletableDeferred<String?>()
-        phase.value = Phase.AskKey(asked)
-        val typed = asked.await()
-        if (typed == null) {
-            note(true, "Restore cancelled")
-            return@session
-        }
-        phase.value = Phase.Busy("Decrypting…")
-        val bytes = withContext(Dispatchers.Default) {
-            val key = BackupFile.parseRecoveryText(typed)
-            try {
-                BackupFile.open(file, key)
-            } finally {
-                key.fill(0)
-            }
-        }
-        importPayload(bytes, "Only add them if this is your own backup.")
-    }
-
-    /** Adds received passkeys, skipping any this phone already has. Returns (added, skipped). */
-    private fun addAll(incoming: List<MovingPasskey>): Pair<Int, Int> {
-        val store = PasskeyStore.get(this)
-        var added = 0
-        var skipped = 0
-        incoming.forEach { moving ->
-            val passkey = moving.passkey
-            val exists = store.all().any {
-                it.credentialId == passkey.credentialId || (it.rpId == passkey.rpId && it.userId == passkey.userId)
-            }
-            if (exists) {
-                skipped++
-                return@forEach
-            }
-            val (publicKey, privateKey) = TransferPayload.keyPair(moving)
-            val id = Base64Url.decode(passkey.credentialId)
-            val wrapped = MovablePasskeys.importKey(id, publicKey, privateKey)
-            moving.privateKey.fill(0)
-            if (store.addIfAbsent(passkey.copy(movable = true, backedUp = true, wrappedKey = wrapped))) {
-                added++
-            } else {
-                PasskeyKeys.delete(id)
-                skipped++
-            }
-        }
-        return added to skipped
     }
 
     /** The QR code lists every Wi-Fi/hotspot address of the new phone; use the first that answers. */
@@ -506,49 +321,13 @@ class TransferActivity : FragmentActivity() {
                     if (current.skipped > 0) {
                         Text("${current.skipped} more already on this phone; they stay as they are.", style = MaterialTheme.typography.bodySmall)
                     }
-                    Text(current.hint, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { current.answer.complete(true) }, enabled = current.passkeys.isNotEmpty()) { Text("Add") }
-                        OutlinedButton(onClick = { current.answer.complete(false) }) { Text("Don't add") }
-                    }
-                }
-                is Phase.ShowKey -> Section("Your recovery key") {
                     Text(
-                        "Save this key now, in a password manager or on paper. The backup can't be opened without " +
-                            "it, by anyone, including this app, and it is shown only this once.",
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Text(
-                        current.text.chunked(20).joinToString("\n"),
-                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                    )
-                    Text(
-                        "Don't keep the key in the same place as the backup file: whoever has both can read your " +
-                            "passkeys. Copying puts it on the clipboard until you copy something else.",
+                        "Only add them if they came from your own old phone.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { current.answer.complete(true) }) { Text("I saved it; choose where to save the file") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { copySecret(current.text) }) { Text("Copy") }
-                        OutlinedButton(onClick = { current.answer.complete(false) }) { Text("Cancel") }
-                    }
-                }
-                is Phase.AskKey -> Section("Recovery key") {
-                    val typed = remember { mutableStateOf("") }
-                    Text("Type or paste the recovery key that was shown when this backup was made.")
-                    OutlinedTextField(
-                        value = typed.value,
-                        onValueChange = { typed.value = it },
-                        label = { Text("Recovery key") },
-                        // The password keyboard doesn't learn or suggest what is typed.
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { current.answer.complete(typed.value) }, enabled = typed.value.isNotBlank()) { Text("Open backup") }
-                        OutlinedButton(onClick = { current.answer.complete(null) }) { Text("Cancel") }
+                        Button(onClick = { current.answer.complete(true) }, enabled = current.passkeys.isNotEmpty()) { Text("Add") }
+                        OutlinedButton(onClick = { current.answer.complete(false) }) { Text("Don't add") }
                     }
                 }
                 is Phase.Busy -> Section(current.what) {
@@ -572,17 +351,6 @@ class TransferActivity : FragmentActivity() {
                         Text("Shows a QR code for the old phone to scan. Both phones on the same Wi-Fi or hotspot.")
                         Button(onClick = ::receive) { Text("Show QR code") }
                     }
-                    Section("Encrypted backup file") {
-                        Text(
-                            "Saves the $movableCount movable passkey(s) into one encrypted file, wherever you choose: " +
-                                "Google Drive, another cloud app, or this phone. The file opens only with a recovery key " +
-                                "shown once when you make it. Without that key nobody can read the file, including this " +
-                                "app, so keep the key somewhere safe and apart from the file.",
-                        )
-                        Button(onClick = ::backup, enabled = movableCount > 0) { Text("Back up to a file") }
-                        Text("Restore a backup made by Passkey Vault, on this phone or a new one.", style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton(onClick = ::restore) { Text("Restore from a backup") }
-                    }
                 }
             }
 
@@ -598,13 +366,6 @@ class TransferActivity : FragmentActivity() {
                 }
             }
         }
-    }
-
-    /** Puts the recovery key on the clipboard, marked sensitive so Android hides it from the clipboard preview. */
-    private fun copySecret(text: String) {
-        val clip = ClipData.newPlainText("Recovery key", text)
-        clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-        getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
     }
 
     /** Turning "Can be moved" on needs the owner's fingerprint; turning it off doesn't. */
