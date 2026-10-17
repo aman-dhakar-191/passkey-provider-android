@@ -67,6 +67,12 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
   key briefly exists outside the Keystore when it's made, sent or received, and copies can exist on
   two phones. Sites see these passkeys as "backup eligible" (and "backed up" once moved). Passkeys
   made before the setting was on, and all passkeys in the store build, stay on their phone.
+  **Encrypted backup (GitHub build, movable passkeys only):** *⋮ → Move passkeys → Back up to a file* saves them
+  into one encrypted file wherever you choose with Android's file picker (Google Drive, another cloud app, or
+  local storage). It needs a fingerprint, and the file opens only with a random 256-bit **recovery key** shown
+  once when you make it: lose the key and nobody can open the backup, including the app; keep the key apart
+  from the file, because whoever has both can restore your passkeys. *Restore from a backup* does the reverse
+  on this phone or a new one. The app itself uses no network for any of this.
   Threats and what protects against each: [docs/MOVING-PASSKEYS-SECURITY.md](docs/MOVING-PASSKEYS-SECURITY.md).
 
 ## Building

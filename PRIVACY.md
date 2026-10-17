@@ -79,6 +79,10 @@ We don't share, sell or rent any information, because we don't have any.
   the website has approved. A passkey only works on the website it was created for, which protects you
   from phishing sites.
 - Passkeys and their details are excluded from Android's cloud backups and device-to-device transfers.
+- GitHub build only: you can save an encrypted backup file of your movable passkeys wherever you choose
+  (for example Google Drive). The app writes it through Android's file picker and sends it nowhere itself. The
+  file can be opened only with a random recovery key shown once on your screen, which the app doesn't store or
+  send. Whoever holds both the file and the key can restore your passkeys, so keep them apart.
 - All downloads use HTTPS.
 
 ## 9. Keeping and deleting data

@@ -49,8 +49,44 @@ Each threat below says which of these it comes down to, and what the code does a
   the PIN. The app re-locks them under the fingerprint-only key at the first chance: quietly when you open
   the app right after unlocking the phone, or when you send them. Until then threat 7 still applies to them.
 
+## Encrypted backup file
+
+*⋮ → Move passkeys → Encrypted backup file* saves the movable passkeys into one file you can keep on Google
+Drive, another cloud app, or the phone. The code is `transfer/BackupFile.kt`; the file is chosen with Android's
+own file picker, so the app needs no storage permission, no Google account and no network access for it.
+
+**"Only this app can open it" can't be enforced, and the app doesn't try.** The source is public, so anyone can
+write a program that reads the format. What the app guarantees is that the file **can't be opened without the
+recovery key**. The file holds no key, and the key is not derived from anything about the phone or the app.
+
+How it works:
+- **Recovery key:** 32 random bytes (256 bits), made fresh for every backup and shown once as 56 letters and
+  digits (no 0/1/I/O) with a 3-byte check that catches typos. Nothing is stored on the phone or in the file.
+  It is random rather than a password you pick, so there is nothing to guess and no password-hashing step is
+  needed. The cost: **lose the key and the backup can never be opened by anyone.**
+- **File:** `PVBK` | version | 16-byte salt | 12-byte nonce | AES-256-GCM ciphertext. The AES key is
+  HKDF-SHA256 of the recovery key and the salt, and the header is authenticated, so a changed file is refused.
+- **Contents:** the same document as a phone-to-phone move (passkeys with their private keys), and the same
+  receiver checks apply when restoring: format, every site, each private key matching its public key, and
+  nothing is added until you tap **Add**.
+- **Making a backup** needs a fingerprint (never the PIN), like sending. The file is written only after you
+  confirm you saved the recovery key, so a backup can't be left behind with a key nobody saw.
+
+| # | Who / what | Can they get passkeys? | Why / what the code does |
+|---|---|---|---|
+| 13 | Someone who gets the backup file (a hacked cloud account, the cloud provider, a lost USB stick) | No | Without the recovery key they would have to break AES-256-GCM. `BackupFileTest`: wrong key refused, any changed byte refused, no plaintext or key in the file |
+| 14 | Someone who gets the file **and** the recovery key | **Yes** | They can restore it on their own phone with their own fingerprint. The restore isn't tied to your phone or your fingerprint, which is what makes a backup useful when your phone is lost. **Keep the key and the file in different places** (the key in a password manager or on paper) |
+| 15 | A thief with your phone and PIN making a backup | No | Making a backup needs a fingerprint, enforced by the vault key in the Keystore (threat 7) |
+| 16 | You lose the recovery key | Nobody can open the backup | By design. Make a new backup (it gets a new key) while you still have the phone |
+| 17 | Someone who sees or copies the key from your screen or clipboard | Possibly | The key screen blocks screenshots and recording (`FLAG_SECURE`), and **Copy** marks the clipboard entry sensitive, but any app you paste into, or the clipboard itself, is outside this app's control |
+| 18 | Someone tampering with a backup, or giving you a crafted one | No | The format is authenticated, restoring checks every field like a received transfer, and nothing is added without your tap. A crafted file also needs the recovery key to open at all |
+
+Restoring needs a fingerprint on the phone, because the restored passkeys are locked under the same
+fingerprint-only vault as any other movable passkey.
+
 ## Open decisions
 
 - **Threat 7:** decided. Fingerprint only; no fingerprint means no moving.
-
-- **Encrypted backup file:** planned for later. It needs a strong passphrase and a slow key-derivation function (for example Argon2id), because a backup file can be attacked offline, unlike the transfer.
+- **Backup file:** decided. A random recovery key instead of a password. A password option could be added
+  later, but it would need a slow key-derivation function (Argon2id or scrypt, neither built into Android) and a
+  strength check, because a backup file can be attacked offline, unlike the transfer.
