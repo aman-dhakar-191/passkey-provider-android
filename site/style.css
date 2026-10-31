@@ -4,7 +4,7 @@
 /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: H, the film's 16:9 frame is shorter than a Stage visual wants; kept it inside the container (a bleed read as overflow) and stack the hero under 72rem */
 /* Hallmark · reworded "Sign in with your fingerprint, not a password." to "Use your fingerprint, not a password." · 58 names the eight-word headline */
 /* Hallmark · reworded "Passkey Vault keeps your passkeys on your Android phone. Use them in apps, in your browser, and on your computer by scanning a QR code." to "Passkey Vault keeps your passkeys on your Android phone." · 58 names the 25-word hero sentence; the rest is said in How it works and Your computer too */
-/* Hallmark · answered F4 · the sound and pause buttons are controls set under the film, not calls to action; one filled primary stands per screen */
+/* Hallmark · answered F4 · the sound and pause buttons are controls laid over the film, not calls to action; one filled primary stands per screen */
 /* Hallmark · answered F20 · the middle step sits lower on purpose; three steps stand across at 1440 */
 /* Hallmark · dismissed 41 · the band's paper is a dark surface only in dark mode, where the ink token is light */
 @import url("./tokens.css");
@@ -40,9 +40,9 @@ h1, h2, h3 { font-stretch: var(--display-stretch); }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; transform: none; }
 .btn--deep { background: var(--color-key); border-color: var(--color-key); color: var(--color-deep); }
 .btn--deep:hover { background: var(--color-on-deep); border-color: var(--color-on-deep); color: var(--color-deep); }
-.btn--quiet { background: var(--color-paper-2); border-color: var(--color-rule); color: var(--color-ink); min-height: 44px; font-size: var(--text-sm); font-weight: 700; }
-.btn--quiet:hover { background: var(--color-paper-3); border-color: var(--color-muted); color: var(--color-ink); }
-.btn--quiet[aria-pressed="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-paper); }
+.btn--quiet { background: color-mix(in oklab, var(--color-deep) 82%, transparent); border-color: color-mix(in oklab, var(--color-on-deep) 40%, transparent); color: var(--color-on-deep); min-height: 44px; font-size: var(--text-sm); font-weight: 700; }
+.btn--quiet:hover { background: var(--color-deep); border-color: var(--color-on-deep); color: var(--color-on-deep); }
+.btn--quiet[aria-pressed="true"] { background: var(--color-key); border-color: var(--color-key); color: var(--color-deep); }
 .btn--quiet:disabled { opacity: 0.55; cursor: not-allowed; background: var(--color-paper-3); border-color: var(--color-rule); color: var(--color-muted); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md) var(--space-lg); margin-top: var(--space-xl); }
 .textlink { color: var(--color-link); font-weight: 700; }
@@ -54,9 +54,9 @@ h1, h2, h3 { font-stretch: var(--display-stretch); }
 .hero h1 { font-size: var(--text-display); line-height: 0.98; letter-spacing: -0.035em; max-width: 9ch; }
 .hero .lead { margin-top: var(--space-lg); max-width: 28ch; color: var(--color-ink-2); }
 .hero .note { margin-top: var(--space-lg); font-size: var(--text-sm); color: var(--color-muted); max-width: 34ch; }
-.film { margin: 0; min-width: 0; }
+.film { position: relative; margin: 0; min-width: 0; }
 .film video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--color-deep); border-radius: var(--radius-card); }
-.film .controls { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-md); }
+.film .controls { position: absolute; left: var(--space-md); top: var(--space-md); display: flex; gap: var(--space-xs); }
 html:not(.js) .film .controls { display: none; }
 
 /* Sections */
