@@ -9,6 +9,7 @@
   <meta property="og:description" content="Sign in with your fingerprint, not a password. Your passkeys stay on your phone.">
   <meta property="og:image" content="https://aman-dhakar-191.github.io/passkey-provider-android/media/passkey-vault.jpg">
   <link rel="icon" href="icon.png">
+  <script>document.documentElement.classList.add("js");</script>
   <link rel="preload" href="fonts/bricolage-200-800-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -27,28 +28,35 @@
   <main>
     <section class="hero">
       <div class="wrap">
-        <h1>Sign in with your fingerprint, not a password.</h1>
-        <p class="lede">Passkey Vault keeps your passkeys on your Android phone. Use them in apps, in your browser, and on your computer by scanning a QR code.</p>
-        <div class="actions">
-          <a class="button" href="https://github.com/aman-dhakar-191/passkey-provider-android/releases/latest">Download for Android</a>
-          <a class="quiet" href="#how">See how it works</a>
+        <div>
+          <h1>Use your fingerprint, not a password.</h1>
+          <p class="lead">Passkey Vault keeps your passkeys on your Android phone.</p>
+          <div class="actions">
+            <a class="btn" href="https://github.com/aman-dhakar-191/passkey-provider-android/releases/latest">Download for Android</a>
+            <a class="textlink" href="#how">See how it works</a>
+          </div>
+          <p class="note">Free. Needs Android 14 or newer and a screen lock. Coming soon to Indus Appstore.</p>
         </div>
-        <div class="film">
-          <video id="film" poster="media/passkey-vault.jpg" autoplay muted loop playsinline preload="auto"
+        <figure class="film">
+          <video id="film" poster="media/passkey-vault.jpg" controls muted loop playsinline preload="auto"
                  aria-label="22-second video: a password form full of Forgot password links, then Passkey Vault signing in with one fingerprint on a phone and on a computer.">
             <source src="media/passkey-vault.webm" type="video/webm">
             <source src="media/passkey-vault.mp4" type="video/mp4">
           </video>
-          <button class="sound" id="sound" type="button" aria-pressed="false">Turn sound on</button>
-        </div>
-        <p class="requirement">Free. Needs Android 14 or newer and a screen lock. Coming soon to Indus Appstore.</p>
+          <div class="controls">
+            <button class="btn btn--quiet" id="sound" type="button" aria-pressed="false">Turn sound on</button>
+            <button class="btn btn--quiet" id="pause" type="button" aria-pressed="false">Pause video</button>
+          </div>
+        </figure>
       </div>
     </section>
 
-    <section class="section" id="how">
+    <section class="section section--band" id="how">
       <div class="wrap">
-        <h2>How it works</h2>
-        <p class="measure">Set it up once. After that, signing in is a tap and a touch.</p>
+        <div class="head">
+          <h2>How it works</h2>
+          <p class="lead">Set it up once. After that, signing in is a tap and a touch.</p>
+        </div>
         <ol class="steps">
           <li>
             <img src="screenshots/screenshot-1.png" alt="Passkey Vault's list of passkeys, grouped by website" loading="lazy" width="1080" height="1920">
@@ -63,7 +71,7 @@
           <li>
             <img src="screenshots/screenshot-3.png" alt="The fingerprint prompt that confirms the sign-in" loading="lazy" width="1080" height="1920">
             <h3>Touch the sensor</h3>
-            <p>Your fingerprint or screen lock confirms it's you, and you're signed in.</p>
+            <p>Your fingerprint or screen lock confirms it’s you, and you’re signed in.</p>
           </li>
         </ol>
       </div>
@@ -73,60 +81,77 @@
       <div class="wrap split">
         <div>
           <h2>Your computer too</h2>
-          <p class="measure">Your phone signs you in to websites on your laptop or desktop. Nothing to install on the computer.</p>
+          <p class="lead">Your phone signs you in to websites on your laptop or desktop. Nothing to install on the computer.</p>
           <ol class="flow">
-            <li>On the computer, choose <strong>Use a phone or tablet</strong> when the site asks for a passkey.</li>
-            <li>Open Passkey Vault and tap <strong>Scan QR code</strong>.</li>
-            <li>Touch the fingerprint sensor. The computer is signed in.</li>
+            <li><span>On the computer, choose <strong>Use a phone or tablet</strong> when the site asks for a passkey.</span></li>
+            <li><span>Open Passkey Vault and tap <strong>Scan QR code</strong>.</span></li>
+            <li><span>Touch the fingerprint sensor. The computer is signed in.</span></li>
           </ol>
-          <p class="measure" style="margin-top:18px;color:var(--muted)">Uses Bluetooth to check your phone is near the computer.</p>
+          <p class="fine">Uses Bluetooth to check your phone is near the computer.</p>
         </div>
-        <img src="screenshots/screenshot-4.png" alt="Scanning a computer's QR code with Passkey Vault" loading="lazy" width="1080" height="1920">
+        <div class="well">
+          <img src="screenshots/screenshot-4.png" alt="Scanning a computer's QR code with Passkey Vault" loading="lazy" width="1080" height="1920">
+        </div>
       </div>
     </section>
 
-    <section class="section">
+    <section class="section section--band">
       <div class="wrap">
-        <h2>Your keys stay with you</h2>
-        <p class="measure">Each passkey is locked inside your phone and can't be copied out, not even by us.</p>
+        <div class="head">
+          <h2>Your keys stay with you</h2>
+          <p class="lead">Each passkey is locked inside your phone and can’t be copied out, not even by us.</p>
+        </div>
         <div class="ledger">
           <div>
             <h3>On your phone</h3>
             <ul>
-              <li><span class="check">✓</span>Your passkeys</li>
-              <li><span class="check">✓</span>Which website each one is for</li>
-              <li><span class="check">✓</span>A short log to help if something goes wrong</li>
+              <li><span class="check" aria-hidden="true">✓</span>Your passkeys</li>
+              <li><span class="check" aria-hidden="true">✓</span>Which website each one is for</li>
+              <li><span class="check" aria-hidden="true">✓</span>A short log to help if something goes wrong</li>
             </ul>
           </div>
           <div>
             <h3>What we get</h3>
             <p class="nothing">Nothing.</p>
-            <p>No account, no cloud, no tracking, no ads. A passkey only works on the real website it was made for, so fake sites can't trick you. <a href="privacy/">Read the privacy policy</a>.</p>
+            <p>No account, no cloud, no tracking, no ads. A passkey only works on the real website it was made for, so fake sites can’t trick you. <a href="privacy/">Read the privacy policy</a>.</p>
           </div>
         </div>
       </div>
     </section>
 
     <section class="section">
-      <div class="wrap">
-        <h2>Keep a second way in</h2>
-        <p class="measure">Passkeys aren't backed up, so if you lose your phone, you lose them. Keep another way to sign in to important accounts, like a password, recovery codes or a passkey on another device. The app's <strong>New or lost phone?</strong> guide walks you through it.</p>
+      <div class="wrap backup">
+        <div class="head">
+          <h2>Keep a second way in</h2>
+          <p class="lead">Passkeys aren’t backed up, so if you lose your phone, you lose them.</p>
+          <p>Keep another way to sign in to important accounts, like:</p>
+        </div>
+        <div>
+          <ul class="rows">
+            <li>A password</li>
+            <li>Recovery codes</li>
+            <li>A passkey on another device</li>
+          </ul>
+          <p class="fine">The app’s <strong>New or lost phone?</strong> guide walks you through it.</p>
+        </div>
       </div>
     </section>
 
     <section class="section get">
-      <div class="wrap">
-        <h2>Get Passkey Vault</h2>
-        <p class="measure">Free and open source. Needs Android 14 or newer and a screen lock.</p>
-        <ol class="setup">
-          <li>Download and install the app.</li>
-          <li>Open it and tap <strong>Passkey settings</strong>. Turn Passkey Vault on and choose it as your preferred service.</li>
-          <li>Next time a website offers passkeys, create one. After that, sign in with your fingerprint.</li>
-        </ol>
-        <div class="actions">
-          <a class="button" href="https://github.com/aman-dhakar-191/passkey-provider-android/releases/latest">Download for Android</a>
-          <a href="https://github.com/aman-dhakar-191/passkey-provider-android">Read the source code</a>
+      <div class="wrap grid">
+        <div>
+          <h2>Get Passkey Vault</h2>
+          <p class="lead">Free and open source. Needs Android 14 or newer and a screen lock.</p>
+          <div class="actions">
+            <a class="btn btn--deep" href="https://github.com/aman-dhakar-191/passkey-provider-android/releases/latest">Download for Android</a>
+            <a href="https://github.com/aman-dhakar-191/passkey-provider-android">Read the source code</a>
+          </div>
         </div>
+        <ol class="setup">
+          <li><span>Download and install the app.</span></li>
+          <li><span>Open it and tap <strong>Passkey settings</strong>. Turn Passkey Vault on and choose it as your preferred service.</span></li>
+          <li><span>Next time a website offers passkeys, create one. After that, sign in with your fingerprint.</span></li>
+        </ol>
       </div>
     </section>
   </main>
@@ -140,22 +165,31 @@
         <a href="mailto:amandhaker191@gmail.com">Contact support</a>
         <a href="https://github.com/aman-dhakar-191/passkey-provider-android/blob/main/LICENSE">Apache License 2.0</a>
       </nav>
-      <span>Page last changed {{SITE_UPDATED}}</span>
+      <span class="stamp">Page last changed {{SITE_UPDATED}}</span>
     </div>
   </footer>
 
   <script>
-    // The video plays muted (browsers only autoplay silent video); sound is the visitor's choice.
-    const film = document.getElementById("film"), sound = document.getElementById("sound");
+    // The video holds still until this script runs, then plays while it is on screen. Sound and pause are the visitor's choice.
+    const film = document.getElementById("film"), sound = document.getElementById("sound"), pause = document.getElementById("pause");
     sound.addEventListener("click", () => {
       film.muted = !film.muted;
-      if (!film.muted) film.play();
+      if (!film.muted && !held) film.play();
       sound.textContent = film.muted ? "Turn sound on" : "Turn sound off";
       sound.setAttribute("aria-pressed", String(!film.muted));
     });
     // With reduced motion, don't autoplay: show the poster and let the visitor start it.
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      film.removeAttribute("autoplay"); film.pause(); film.controls = true;
+    let held = matchMedia("(prefers-reduced-motion: reduce)").matches, seen = false;
+    if (held) { film.controls = true; pause.hidden = true; }
+    else {
+      film.controls = false;
+      const sync = () => {
+        if (seen && !held) film.play().catch(() => {}); else film.pause();
+        pause.textContent = held ? "Play video" : "Pause video";
+        pause.setAttribute("aria-pressed", String(held));
+      };
+      pause.addEventListener("click", () => { held = !held; sync(); });
+      new IntersectionObserver(([e]) => { seen = e.isIntersecting; sync(); }).observe(film);
     }
   </script>
 </body>
