@@ -1,0 +1,26 @@
+@font-face { font-family: "Bricolage"; src: url("fonts/bricolage-200-800-normal.woff2") format("woff2"); font-weight: 200 800; font-stretch: 75% 100%; font-display: swap; }
+@font-face { font-family: "Atkinson"; src: url("fonts/atkinson-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Atkinson"; src: url("fonts/atkinson-700-normal.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Atkinson"; src: url("fonts/atkinson-400-italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+:root {
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
+  --text-xs: 0.8125rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.25rem; --text-xl: 1.5625rem; --text-2xl: 1.953rem; --text-3xl: 2.441rem;
+  --text-display-s: clamp(2.25rem, 4vw + 0.5rem, 3.75rem); --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
+  --text-section: clamp(2rem, 2.5vw + 1rem, 3.5rem); --text-title: clamp(1.25rem, 0.75vw + 0.875rem, 1.625rem); --text-lead: clamp(1.125rem, 0.35vw + 1rem, 1.375rem);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  --color-error: oklch(52% 0.19 27); --color-success: oklch(50% 0.12 150);
+  --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
+  --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
+  --color-paper: #F3F5FB; --color-paper-2: #FFFFFF; --color-paper-3: #E6EAF7;
+  --color-ink: #1E1B4B; --color-ink-2: #34315F; --color-muted: #4A4F6A;
+  --color-rule: #D0D6EC; --color-link: #1D4ED8; --color-deep: #1E1B4B; --color-on-deep: #FFFFFF; --color-on-deep-2: #D5DCF7; --color-key: #A8C7FA; --color-check: #16A34A;
+  --color-accent: #2563EB; --color-accent-ink: #FFFFFF; --color-focus: #2563EB;
+  --font-display: "Bricolage", "Atkinson", ui-sans-serif, system-ui, sans-serif; --font-body: "Atkinson", ui-sans-serif, system-ui, sans-serif; --display-weight: 800; --display-stretch: 92%; --font-outlier: var(--font-body);
+  --radius-card: 20px; --radius-ctl: 12px; --radius-pill: 999px; --rule-hair: 1px; --shadow-card: none;
+  --tracking-display: -0.025em; --text-md: 1.125rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --color-paper: #11132A; --color-paper-2: #181B36; --color-paper-3: #1F2342; --color-ink: #E7E9F6; --color-ink-2: #C9CDE6; --color-muted: #A9AFCB; --color-rule: #2C3058;
+          --color-link: #A8C7FA; --color-accent: #A8C7FA; --color-accent-ink: #1E1B4B; --color-focus: #A8C7FA; --color-deep: #0B0C20; --color-check: #4ADE80; }
+}
