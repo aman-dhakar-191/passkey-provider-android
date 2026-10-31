@@ -1,7 +1,7 @@
 /* Hallmark · shape: Stage, product · genre: modern-minimal · theme: brand · redesign: full
- * paper: oklch(97% 0.008 271) · accent: oklch(55% 0.215 263) · display: Bricolage · body: Atkinson · hero: Stage · nav: edge-aligned · footer: mast · signature: the 22-second film of one fingerprint signing in, bleeding off the hero's right edge
+ * paper: oklch(97% 0.008 271) · accent: oklch(55% 0.215 263) · display: Bricolage · body: Atkinson · hero: Stage · nav: edge-aligned · footer: mast · signature: the 22-second film of one fingerprint signing in, set inside the container beside the head
  * axes: light/grotesk-heavy/chromatic-blue · posture: Stage · contrast: pass · fold: pass · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: H, the film's 16:9 frame is shorter than a Stage visual wants; let it bleed off the right edge and set the head beside it instead of shrinking it into a card */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: H, the film's 16:9 frame is shorter than a Stage visual wants; kept it inside the container (a bleed read as overflow) and stack the hero under 72rem */
 /* Hallmark · reworded "Sign in with your fingerprint, not a password." to "Use your fingerprint, not a password." · 58 names the eight-word headline */
 /* Hallmark · reworded "Passkey Vault keeps your passkeys on your Android phone. Use them in apps, in your browser, and on your computer by scanning a QR code." to "Passkey Vault keeps your passkeys on your Android phone." · 58 names the 25-word hero sentence; the rest is said in How it works and Your computer too */
 /* Hallmark · answered F4 · the sound and pause buttons are controls set under the film, not calls to action; one filled primary stands per screen */
@@ -54,8 +54,8 @@ h1, h2, h3 { font-stretch: var(--display-stretch); }
 .hero h1 { font-size: var(--text-display); line-height: 0.98; letter-spacing: -0.035em; max-width: 9ch; }
 .hero .lead { margin-top: var(--space-lg); max-width: 28ch; color: var(--color-ink-2); }
 .hero .note { margin-top: var(--space-lg); font-size: var(--text-sm); color: var(--color-muted); max-width: 34ch; }
-.film { margin: 0; margin-right: calc(-1 * var(--gutter)); }
-.film video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--color-deep); border-radius: var(--radius-card) 0 0 var(--radius-card); }
+.film { margin: 0; min-width: 0; }
+.film video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--color-deep); border-radius: var(--radius-card); }
 .film .controls { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-md); }
 html:not(.js) .film .controls { display: none; }
 
@@ -126,13 +126,14 @@ footer .stamp { align-self: center; }
 .doc code { font-size: 0.95rem; background: var(--color-paper-2); border: 1px solid var(--color-rule); border-radius: 6px; padding: 0 var(--space-2xs); overflow-wrap: anywhere; }
 .updated { margin-top: var(--space-xl); padding-top: var(--space-md); border-top: 1px solid var(--color-rule); color: var(--color-muted); font-size: var(--text-md); }
 
-@media (max-width: 60rem) {
-  :root { --bar: 64px; }
+@media (max-width: 72rem) {
   .hero { min-height: 0; padding-block: var(--space-xl) var(--space-2xl); display: block; }
   .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
   .hero h1 { max-width: 12ch; }
   .hero .lead { max-width: 30ch; }
-  .film { margin-right: 0; } .film video { border-radius: var(--radius-card); }
+}
+@media (max-width: 60rem) {
+  :root { --bar: 64px; }
   .steps { grid-template-columns: minmax(0, 1fr); gap: var(--space-2xl); }
   .steps li { max-width: 340px; }
   .steps li:nth-child(2) { margin-top: 0; }
