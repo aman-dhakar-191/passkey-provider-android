@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The app icon's shield, in exactly the same place, with a QR badge in the bottom-right corner. Everything
+         stays within the 33dp-radius adaptive-icon safe zone, so no launcher shape (circle, square, squircle)
+         cuts it. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M54,27 L77,35.5 L77,52 C77,66.5 67.5,77 54,82 C40.5,77 31,66.5 31,52 L31,35.5 Z M60.5,50 A6.5,6.5 0 1,0 47.5,50 A6.5,6.5 0 1,0 60.5,50 Z M51.5,56.5 L49.5,68 L58.5,68 L56.5,56.5 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#1E1B4B"
+        android:strokeWidth="1.8"
+        android:pathData="M60.10,56.60 H74.10 A3.5,3.5 0 0,1 77.60,60.10 V74.10 A3.5,3.5 0 0,1 74.10,77.60 H60.10 A3.5,3.5 0 0,1 56.60,74.10 V60.10 A3.5,3.5 0 0,1 60.10,56.60 Z" />
+    <path
+        android:fillColor="#1E3A8A"
+        android:pathData="M59.30,59.30 h6.30 v6.30 h-6.30 Z M68.60,59.30 h6.30 v6.30 h-6.30 Z M59.30,68.60 h6.30 v6.30 h-6.30 Z M68.60,68.60 h2.50 v2.50 h-2.50 Z M72.40,68.60 h2.50 v2.50 h-2.50 Z M68.60,72.40 h2.50 v2.50 h-2.50 Z M72.40,72.40 h2.50 v2.50 h-2.50 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M61.40,61.40 h2.10 v2.10 h-2.10 Z M70.70,61.40 h2.10 v2.10 h-2.10 Z M61.40,70.70 h2.10 v2.10 h-2.10 Z" />
+</vector>

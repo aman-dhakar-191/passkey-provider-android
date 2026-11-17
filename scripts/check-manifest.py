@@ -23,6 +23,7 @@ APP = "io.github.amandhakar.passkey."
 # Our components that other apps may start, and the permission the caller must hold (None = anyone).
 OUR_EXPORTED = {
     APP + "ui.MainActivity": None,  # the launcher icon
+    APP + "ui.ScanQrActivity": None,  # the second launcher icon, "Scan QR": only opens the QR scanner
     # Only the system holds BIND_CREDENTIAL_PROVIDER_SERVICE, so only Android itself can bind.
     APP + "provider.PasskeyProviderService": "android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE",
 }

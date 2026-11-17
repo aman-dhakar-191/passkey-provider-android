@@ -19,9 +19,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.R
 import io.github.amandhakar.passkey.crypto.PasskeyKeys
@@ -59,8 +56,6 @@ class MainActivity : FragmentActivity() {
             lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) }
         }
         addScanShortcut()
-        // Opened from the app icon's long-press "Scan QR code" shortcut.
-        if (savedInstanceState == null && intent?.action == ACTION_SCAN_QR) scanQr()
         val store = PasskeyStore.get(this)
         setContent {
             PasskeyTheme {
@@ -98,11 +93,6 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        if (intent.action == ACTION_SCAN_QR) scanQr()
-    }
-
     /**
      * Long-pressing the app icon offers "Scan QR code", straight to the scanner for signing in on another
      * device. A dynamic shortcut, not a static one in XML, so it points at this build's own package (debug
@@ -114,7 +104,7 @@ class MainActivity : FragmentActivity() {
                 .setShortLabel("Scan QR code")
                 .setLongLabel("Scan a passkey QR code")
                 .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_scan))
-                .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_SCAN_QR))
+                .setIntent(Intent(this, ScanQrActivity::class.java).setAction(Intent.ACTION_VIEW))
                 .build()
             getSystemService(ShortcutManager::class.java)?.setDynamicShortcuts(listOf(shortcut))
         }
@@ -148,35 +138,8 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /**
-     * Desktop sign-in: the desktop browser shows a "FIDO:/..." QR code. Google Play services owns the
-     * hybrid (caBLE) transport - Bluetooth proximity check plus the encrypted tunnel - and, once
-     * connected, asks Credential Manager, which offers this app's passkeys. We just hand it the code.
-     */
-    private fun scanQr() {
-        val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
-        GmsBarcodeScanning.getClient(this, options).startScan()
-            .addOnSuccessListener { barcode ->
-                val raw = barcode.rawValue.orEmpty()
-                if (!raw.startsWith("FIDO:/", ignoreCase = true)) {
-                    toast("That is not a passkey QR code")
-                    return@addOnSuccessListener
-                }
-                val uri = Uri.parse(raw)
-                // The code holds the secret for the desktop sign-in, so it goes only to Google Play services
-                // (which runs that sign-in), never to another app that also claims FIDO links.
-                val launched = listOf(uri, uri.normalizeScheme()).any {
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, it).setPackage(PLAY_SERVICES))
-                        true
-                    } catch (_: ActivityNotFoundException) {
-                        false
-                    }
-                }
-                if (!launched) toast("Google Play services is needed for cross-device sign-in")
-            }
-            .addOnFailureListener { toast("Scanner unavailable: ${it.message}") }
-    }
+    /** Cross-device sign-in: scan the computer's passkey QR code (see [PasskeyQr]). */
+    private fun scanQr() = PasskeyQr.scan(this)
 
     private fun deletePasskey(passkey: Passkey) {
         lifecycleScope.launch {
@@ -231,9 +194,7 @@ class MainActivity : FragmentActivity() {
 }
 
 private const val EXTRA_RUN_SELF_TEST = "run_self_test"
-private const val PLAY_SERVICES = "com.google.android.gms"
 private const val SHORTCUT_SCAN = "scan_qr"
-private const val ACTION_SCAN_QR = "io.github.amandhakar.passkey.action.SCAN_QR"
 
 sealed interface UpdateState {
     data object Idle : UpdateState
