@@ -6,6 +6,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -20,6 +23,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import io.github.amandhakar.passkey.BuildConfig
+import io.github.amandhakar.passkey.R
 import io.github.amandhakar.passkey.crypto.PasskeyKeys
 import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.data.PasskeyStore
@@ -54,6 +58,9 @@ class MainActivity : FragmentActivity() {
         if (BuildConfig.SELF_TEST && savedInstanceState == null && intent.getBooleanExtra(EXTRA_RUN_SELF_TEST, false)) {
             lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) }
         }
+        addScanShortcut()
+        // Opened from the app icon's long-press "Scan QR code" shortcut.
+        if (savedInstanceState == null && intent?.action == ACTION_SCAN_QR) scanQr()
         val store = PasskeyStore.get(this)
         setContent {
             PasskeyTheme {
@@ -88,6 +95,28 @@ class MainActivity : FragmentActivity() {
         // unlocked (no prompt). Nothing to do in the store build.
         if (MovablePasskeys.ENABLED) {
             lifecycleScope.launch(Dispatchers.IO) { runCatching { MovablePasskeys.upgradeQuietly(this@MainActivity) } }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == ACTION_SCAN_QR) scanQr()
+    }
+
+    /**
+     * Long-pressing the app icon offers "Scan QR code", straight to the scanner for signing in on another
+     * device. A dynamic shortcut, not a static one in XML, so it points at this build's own package (debug
+     * builds have another). Launchers that don't support app shortcuts simply don't show it.
+     */
+    private fun addScanShortcut() {
+        runCatching {
+            val shortcut = ShortcutInfo.Builder(this, SHORTCUT_SCAN)
+                .setShortLabel("Scan QR code")
+                .setLongLabel("Scan a passkey QR code")
+                .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_scan))
+                .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_SCAN_QR))
+                .build()
+            getSystemService(ShortcutManager::class.java)?.setDynamicShortcuts(listOf(shortcut))
         }
     }
 
@@ -203,6 +232,8 @@ class MainActivity : FragmentActivity() {
 
 private const val EXTRA_RUN_SELF_TEST = "run_self_test"
 private const val PLAY_SERVICES = "com.google.android.gms"
+private const val SHORTCUT_SCAN = "scan_qr"
+private const val ACTION_SCAN_QR = "io.github.amandhakar.passkey.action.SCAN_QR"
 
 sealed interface UpdateState {
     data object Idle : UpdateState
