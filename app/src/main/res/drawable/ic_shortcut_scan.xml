@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App shortcut icon (long-press the app icon → Scan QR code): a QR code in a scan frame. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,0 A24,24 0 1,1 24,48 A24,24 0 1,1 24,0 Z" />
+    <path
+        android:fillColor="#FF1E3A8A"
+        android:pathData="M12,12 h8 v2 h-6 v6 h-2 Z M36,12 v8 h-2 v-6 h-6 v-2 Z M12,36 v-8 h2 v6 h6 v2 Z M36,36 h-8 v-2 h6 v-6 h2 Z M18,18 h5 v5 h-5 Z M25,18 h5 v5 h-5 Z M18,25 h5 v5 h-5 Z M25,25 h2 v2 h-2 Z M28,28 h2 v2 h-2 Z M25,28 h2 v2 h-2 Z M28,25 h2 v2 h-2 Z" />
+</vector>
