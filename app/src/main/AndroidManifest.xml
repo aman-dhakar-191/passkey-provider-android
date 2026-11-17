@@ -22,6 +22,23 @@
             </intent-filter>
         </activity>
 
+        <!-- Second launcher icon, "Scan QR": goes straight to the passkey QR scanner, in its own task so it
+             works even while the app is open, and leaves nothing in Recents. -->
+        <activity
+            android:name=".ui.ScanQrActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_scan"
+            android:label="@string/scan_qr_label"
+            android:taskAffinity="${applicationId}.scan"
+            android:theme="@style/Theme.Passkey.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- Shows the stack trace of the last crash; separate process so it survives the crash. -->
         <activity
             android:name=".CrashActivity"
