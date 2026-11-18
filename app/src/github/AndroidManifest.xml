@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- GitHub channel only: the self-updater (src/github/java/.../update) and moving passkeys to a new phone
-     (src/github/java/.../transfer). Store builds contain none of this. -->
+<!-- GitHub channel only: moving passkeys to a new phone (src/github/java/.../transfer) and Backup & recovery
+     (src/github/java/.../recovery). Updates come from the app store it is installed from, not from the app.
+     Store builds contain none of this. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Backup & recovery's reminder when a keeper's check is due. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application>
-        <receiver
-            android:name="io.github.amandhakar.passkey.update.InstallResultReceiver"
-            android:exported="false" />
-
         <!-- Moving passkeys to another phone (src/github/java/.../transfer). Opened only from the app's menu. -->
         <activity
             android:name="io.github.amandhakar.passkey.transfer.TransferActivity"
