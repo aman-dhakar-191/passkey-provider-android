@@ -1,6 +1,5 @@
 package io.github.amandhakar.passkey.ui
 
-import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -15,7 +14,6 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -28,29 +26,17 @@ import io.github.amandhakar.passkey.provider.PasskeyProviderService
 import io.github.amandhakar.passkey.provider.ProviderErrors
 import io.github.amandhakar.passkey.provider.verifyUser
 import io.github.amandhakar.passkey.transfer.MovablePasskeys
-import io.github.amandhakar.passkey.update.Release
-import io.github.amandhakar.passkey.update.Updater
 import io.github.amandhakar.passkey.webauthn.Base64Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
-    // Self-update only in the github channel's non-debug builds (debug builds have another package name).
-    // CI's "minified" build has it on too, so the emulator test starts WorkManager under R8.
-    private val updatesEnabled = Updater.ENABLED && !BuildConfig.DEBUG
     private val providerEnabled = mutableStateOf(false)
-    private val updateState = mutableStateOf<UpdateState>(UpdateState.Idle)
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (updatesEnabled) {
-            Updater.schedule(this)
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            if (savedInstanceState == null) checkForUpdate(quiet = true)
-        }
         // Used by the emulator test in CI (scripts/emulator_selftest.py); never in release builds.
         if (BuildConfig.SELF_TEST && savedInstanceState == null && intent.getBooleanExtra(EXTRA_RUN_SELF_TEST, false)) {
             lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) }
@@ -63,16 +49,12 @@ class MainActivity : FragmentActivity() {
                     passkeysFlow = store.passkeys,
                     problemsFlow = ProviderErrors.latest,
                     providerEnabled = providerEnabled.value,
-                    updateState = updateState.value,
-                    updatesEnabled = this.updatesEnabled,
                     versionName = BuildConfig.VERSION_NAME,
                     onOpenProviderSettings = ::openProviderSettings,
                     onScanQr = ::scanQr,
                     onSelfTest = { lifecycleScope.launch { toast(SelfTest.run(this@MainActivity)) } },
                     onDelete = ::deletePasskey,
                     onRename = { passkey, name -> store.rename(passkey.credentialId, name) },
-                    onCheckUpdate = { checkForUpdate(quiet = false) },
-                    onInstallUpdate = ::installUpdate,
                     onCopyProblems = ::copyProblems,
                     onClearProblems = { ProviderErrors.clear(this) },
                     onMovePasskeys = if (MovablePasskeys.ENABLED) ({ MovablePasskeys.open(this) }) else null,
@@ -154,54 +136,8 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun checkForUpdate(quiet: Boolean) {
-        updateState.value = UpdateState.Checking
-        lifecycleScope.launch {
-            updateState.value = try {
-                val release = withContext(Dispatchers.IO) { Updater.latestRelease() }
-                if (release != null && Updater.isNewer(release)) UpdateState.Available(release)
-                else if (quiet) UpdateState.Idle else UpdateState.UpToDate
-            } catch (e: Exception) {
-                if (quiet) UpdateState.Idle else UpdateState.Error(e.message ?: "Update check failed")
-            }
-        }
-    }
-
-    private fun installUpdate(release: Release) {
-        if (!Updater.canInstall(this)) {
-            toast("Allow this app to install updates, then tap Install again")
-            startActivity(
-                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
-            )
-            return
-        }
-        lifecycleScope.launch {
-            try {
-                val apk = withContext(Dispatchers.IO) {
-                    Updater.download(this@MainActivity, release) { p ->
-                        runOnUiThread { updateState.value = UpdateState.Downloading(release, p) }
-                    }
-                }
-                updateState.value = UpdateState.Installing
-                withContext(Dispatchers.IO) { Updater.install(this@MainActivity, apk) }
-            } catch (e: Exception) {
-                updateState.value = UpdateState.Error(e.message ?: "Update failed")
-            }
-        }
-    }
-
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }
 
 private const val EXTRA_RUN_SELF_TEST = "run_self_test"
 private const val SHORTCUT_SCAN = "scan_qr"
-
-sealed interface UpdateState {
-    data object Idle : UpdateState
-    data object Checking : UpdateState
-    data object UpToDate : UpdateState
-    data class Available(val release: Release) : UpdateState
-    data class Downloading(val release: Release, val progress: Float) : UpdateState
-    data object Installing : UpdateState
-    data class Error(val message: String) : UpdateState
-}
