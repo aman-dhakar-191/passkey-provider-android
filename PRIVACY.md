@@ -58,19 +58,18 @@ The app only downloads public files. It never uploads your passkeys or passkey d
 - **A website's `/.well-known/assetlinks.json`**, when an app (not a browser) asks for a passkey, to
   check that the website allows that app to use its passkeys.
 - **Firebase** (Google servers), when the app crashes and during use, as described in section 3.
-- **GitHub version only:** the latest release information from GitHub once a day, and the new version
-  if you choose to update. App-store versions don't do this; the store handles updates.
 
-Like any internet connection, these reveal your phone's IP address to the server that answers (Google,
-the website, or GitHub), under that company's own privacy policy.
+The app never checks for updates itself; the store or app catalogue you installed it from does that.
+
+Like any internet connection, these reveal your phone's IP address to the server that answers (Google, Firebase or
+the website), under that company's own privacy policy.
 
 ## 5. Permissions
 - **Internet:** for the downloads in section 4.
 - **Biometrics:** to confirm it's you, with your fingerprint (or other strong biometric) or screen
   lock, before a passkey is created or used. Android does the check; the app never receives your
   fingerprint.
-- **Notifications (GitHub version only):** to tell you when an update is available.
-- **Install apps (GitHub version only):** to install an update you chose to download.
+- **Notifications (GitHub version only):** to remind you when a Backup & recovery check is due.
 
 The **Scan QR code** button uses Google's code scanner, part of Google Play services, so the app itself
 doesn't need camera permission and never receives camera images; it only gets the scanned text.

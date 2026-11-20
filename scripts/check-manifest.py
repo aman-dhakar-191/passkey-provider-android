@@ -49,6 +49,7 @@ DENIED_PERMISSIONS = {
     "android.permission.GET_ACCOUNTS",
     "android.permission.USE_CREDENTIALS",
     "android.permission.REQUEST_DELETE_PACKAGES",
+    "android.permission.REQUEST_INSTALL_PACKAGES",  # no self-updater in any channel
     "android.permission.PACKAGE_USAGE_STATS",
     "android.permission.BIND_DEVICE_ADMIN",
 }

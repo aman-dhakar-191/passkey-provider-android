@@ -41,7 +41,7 @@ jobs:
       - name: Unit tests, lint, and debug + (unsigned) release builds of both channels and the demo app
         run: ./gradlew --no-daemon testGithubDebugUnitTest lintGithubDebug lintStoreDebug assembleGithubDebug assembleGithubRelease assembleStoreRelease bundleStoreRelease :demo:testDebugUnitTest :demo:lintDebug :demo:assembleRelease
 
-      - name: Store build contains no self-update code
+      - name: No build contains self-update code; the store build has no GitHub-only extras
         run: |
           scripts/check-store-build.sh \
             app/build/outputs/apk/store/release/*.apk \
