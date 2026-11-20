@@ -1,6 +1,10 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 // Version comes from the git tag in CI (-PappVersionName=1.2.3). versionCode is derived from it so
@@ -10,8 +14,6 @@ val appVersionCode = appVersionName.substringBefore('-').split('.')
     .map { it.toIntOrNull() ?: 0 }
     .let { it + List(3) { 0 } }
     .let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
-
-val updateRepo = (findProperty("updateRepo") as String?) ?: "aman-dhakar-191/passkey-provider-android"
 
 // Release signing keys come from the environment (GitHub Actions secrets). The same key must sign every
 // release, otherwise Android refuses to install the update over the existing app.
@@ -31,6 +33,9 @@ android {
         versionName = appVersionName
         // The in-app passkey self-test and its reserved RP ID; never in release builds.
         buildConfigField("boolean", "SELF_TEST", "false")
+        // Firebase Analytics and Crashlytics report only from release builds (both channels). Debug and
+        // minified builds (emulator CI, local runs) switch them off in the manifest, before Firebase starts.
+        manifestPlaceholders["telemetry"] = "true"
     }
 
     signingConfigs {
@@ -62,6 +67,7 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             buildConfigField("boolean", "SELF_TEST", "true")
+            manifestPlaceholders["telemetry"] = "false"
         }
         // Release's R8 settings with the debug package, debug key and the self-test. Not debuggable, since
         // R8 skips its optimizations for debuggable builds and this must behave like release.
@@ -73,22 +79,26 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             matchingFallbacks += "debug"
+            // Never upload this CI-only build's R8 mapping to Crashlytics.
+            configure<CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
 
     // Two release channels from the same code (src/main is shared):
-    //  - github: sideloaded from GitHub Releases. src/github adds the self-updater, its permissions
-    //            (REQUEST_INSTALL_PACKAGES, POST_NOTIFICATIONS) and WorkManager, and moving passkeys to a
-    //            new phone (src/github/java/.../transfer, a setting that is off by default).
-    //  - store:  Google Play / Indus Appstore, which deliver updates. src/store only has a stub, so the
-    //            store app contains no update code at all (checked by scripts/check-store-build.sh).
+    //  - github: installed from GitHub Releases (by hand or through the private app store, which delivers its
+    //            updates). src/github adds moving passkeys to a new phone (src/github/java/.../transfer, a
+    //            setting that is off by default) and Backup & recovery with its reminders (POST_NOTIFICATIONS,
+    //            WorkManager).
+    //  - store:  Google Play / Indus Appstore, which deliver updates. It has none of the github extras.
+    //  Neither channel updates itself: scripts/check-store-build.sh checks that no build contains update code.
     flavorDimensions += "distribution"
     productFlavors {
         create("github") {
             dimension = "distribution"
             // Activity log: every step of every request (this is the channel used for debugging).
             buildConfigField("boolean", "LOG_ALL_REQUESTS", "true")
-            buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
             buildConfigField("boolean", "BLOCK_SCREENSHOTS", "false")
         }
         create("store") {
@@ -132,7 +142,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.biometric)
-    "githubImplementation"(libs.androidx.work.runtime.ktx) // only the self-updater uses WorkManager
+    // Crash reports and usage statistics (both channels); see PRIVACY.md.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+    "githubImplementation"(libs.androidx.work.runtime.ktx) // only the Backup & recovery reminder uses WorkManager
     // Moving passkeys to a new phone: the secure channel (shared with Crypto Lab) and drawing the QR code.
     "githubImplementation"(project(":securechannel"))
     "githubImplementation"(libs.zxing.core)

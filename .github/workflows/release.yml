@@ -1,8 +1,8 @@
 name: Release
 
 # Run manually and pick patch / minor / major: the next version is worked out from the latest
-# vX.Y.Z tag. Pushing a tag like v1.2.3 also works. Installed apps check the latest release and
-# update themselves.
+# vX.Y.Z tag. Pushing a tag like v1.2.3 also works. The app does not update itself; the private app
+# store (or a manual install) delivers the new APK.
 on:
   push:
     tags: ["v*.*.*"]

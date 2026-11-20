@@ -20,7 +20,7 @@ screen lock, with no passwords to remember or type.
 • Keys are created in your phone's secure hardware and never leave it.
 • Anti-phishing: a passkey only works on the website it was created for, and only trusted browsers and
   verified apps can use it.
-• No account, no cloud, no tracking, no ads.
+• No account, no cloud, no ads. Only anonymous crash reports and usage statistics are sent.
 
 Passkeys are stored only on this phone and aren't synced or backed up. Keep another way to sign in to
 important accounts.
@@ -35,7 +35,13 @@ Set up: install, then choose Passkey Vault under Settings → Passwords, passkey
 - Terms of use URL: https://aman-dhakar-191.github.io/passkey-provider-android/terms/
 
 ## Google Play "Data safety" answers (store build)
-- Does the app collect or share any of the required user data types? **No**
+- Does the app collect or share any of the required user data types? **Yes** (Firebase)
+  - **App info and performance → Crash logs, Diagnostics**: collected (Firebase Crashlytics), not shared
+    (Google acts as our service provider), purpose *App functionality / Analytics*.
+  - **Device or other IDs** (Firebase installation / app-instance ID) and **App activity → App
+    interactions** (Firebase Analytics): collected, purpose *Analytics*. The advertising-ID permission
+    is removed in the manifest. Nothing is linked to identity or used for ads. Re-check against
+    Google's Firebase data disclosure before submitting.
   - Passkeys and account names stay on the device and are never sent anywhere. Play only counts data
     that leaves the device.
 - Is data encrypted in transit? Yes (all requests use HTTPS). Users can request deletion: uninstall

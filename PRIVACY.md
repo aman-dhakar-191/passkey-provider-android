@@ -5,7 +5,8 @@ applies to every version of the app: the one from GitHub and the ones from app s
 Google Play).
 
 **In short:** your passkeys and everything about them stay on your phone. The developer never receives
-any of it. There is no account, no server, no analytics, no ads and no tracking.
+any of it. There is no account, no server of ours, no ads and no tracking. The only thing sent is anonymous crash reports and
+usage statistics (section 3), which contain no passkeys and no website names.
 
 ## 1. Who we are
 Passkey Vault is made by **Aman Dhakar**, an individual developer in India ("we", "us"). For any
@@ -27,12 +28,26 @@ Keystore. We can't see, access or copy any of it.
     websites you have passkeys for (only how many passkeys you have).
   - **GitHub version** records every passkey request (which app asked, for which website, and the
     result) and the websites you have passkeys for, to help diagnose problems.
-- **Crash reports.** If the app crashes, the error details are shown to you on the phone. They are
-  never sent anywhere.
+- **Crash reports.** If the app crashes, the error details are shown to you on the phone, and an
+  anonymous copy is sent to the developer (section 3).
 
 ## 3. Information we collect
-**None.** The app has no account and sends no personal data to us or to anyone else. We don't use
-analytics, advertising or crash-reporting services.
+The app has no account and sends no passkeys, passkey details, website names or personal data to us or to
+anyone else. We don't use advertising. Every version (GitHub and app stores) does use two Google
+Firebase services to keep the app working:
+
+- **Firebase Crashlytics** sends a report when the app crashes: the error and stack trace, the app
+  version, your phone's make, model and Android version, whether the app was in the foreground, and a
+  random installation ID.
+- **Firebase Analytics** sends anonymous usage statistics: which app version is installed, your phone's
+  model and Android version, your country and language, how often and for how long the app is opened,
+  and a random app-instance ID. It does not read the advertising ID, and none of it names your websites
+  or passkeys.
+
+Google processes this for us under the Firebase terms and
+[Google's privacy policy](https://policies.google.com/privacy); see also
+https://firebase.google.com/support/privacy. We use it only to find and fix crashes and to see which
+Android versions and phones to support. Debug builds used for development send nothing.
 
 ## 4. Internet connections the app makes
 The app only downloads public files. It never uploads your passkeys or passkey details.
@@ -42,24 +57,26 @@ The app only downloads public files. It never uploads your passkeys or passkey d
   a browser asking for a passkey is genuine.
 - **A website's `/.well-known/assetlinks.json`**, when an app (not a browser) asks for a passkey, to
   check that the website allows that app to use its passkeys.
-- **GitHub version only:** the latest release information from GitHub once a day, and the new version
-  if you choose to update. App-store versions don't do this; the store handles updates.
+- **Firebase** (Google servers), when the app crashes and during use, as described in section 3.
 
-Like any internet connection, these reveal your phone's IP address to the server that answers (Google,
-the website, or GitHub), under that company's own privacy policy.
+The app never checks for updates itself; the store or app catalogue you installed it from does that.
+
+Like any internet connection, these reveal your phone's IP address to the server that answers (Google, Firebase or
+the website), under that company's own privacy policy.
 
 ## 5. Permissions
 - **Internet:** for the downloads in section 4.
 - **Biometrics:** to confirm it's you, with your fingerprint (or other strong biometric) or screen
   lock, before a passkey is created or used. Android does the check; the app never receives your
   fingerprint.
-- **Notifications (GitHub version only):** to tell you when an update is available.
-- **Install apps (GitHub version only):** to install an update you chose to download.
+- **Notifications (GitHub version only):** to remind you when a Backup & recovery check is due.
 
 The **Scan QR code** button uses Google's code scanner, part of Google Play services, so the app itself
 doesn't need camera permission and never receives camera images; it only gets the scanned text.
 
 ## 6. Other companies' services
+- **Google Firebase** (Crashlytics and Analytics) receives the crash reports and usage statistics
+  described in section 3.
 - **Google Play services** runs the QR-code scanner and, when you sign in on a computer, the Bluetooth
   and connection step of that sign-in. Google's privacy policy applies:
   https://policies.google.com/privacy.
@@ -70,7 +87,8 @@ doesn't need camera permission and never receives camera images; it only gets th
   own privacy policy.
 
 ## 7. Sharing and selling
-We don't share, sell or rent any information, because we don't have any.
+We don't sell or rent any information. The crash reports and anonymous statistics in section 3 are
+processed by Google (Firebase) on our behalf; we share them with no one else.
 
 ## 8. Security
 - Passkeys are created and used inside the phone's secure hardware, and each use needs your
@@ -88,7 +106,9 @@ We don't share, sell or rent any information, because we don't have any.
 - All downloads use HTTPS.
 
 ## 9. Keeping and deleting data
-Everything stays on your phone until you delete it:
+Your passkeys and their details stay on your phone until you delete them. Crash reports and statistics are
+tied only to a random ID, which resets when you uninstall the app; to ask for it to be deleted, email us
+(section 1). On the phone:
 - **Delete one passkey** in the app (🗑). Also remove it from the website's account settings, because
   deleting it on the phone doesn't tell the website.
 - **Clear the activity log** in the app.

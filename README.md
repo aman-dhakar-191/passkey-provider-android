@@ -23,7 +23,7 @@ Requires **Android 14 (API 34) or newer**, with a screen lock set up.
 | Private keys (Android Keystore / StrongBox; they never leave the device, except movable passkeys below) | `crypto/PasskeyKeys.kt` |
 | Moving passkeys to a new phone (GitHub build only, opt-in) | `app/src/github/.../transfer/`, `securechannel/` |
 | Backup & recovery with keepers (GitHub build only) | `app/src/github/.../recovery/` |
-| Self-update from GitHub Releases (GitHub build only) | `app/src/github/.../update/` |
+| Crash reports and usage statistics (both channels; Firebase, off in debug builds) | `app/build.gradle.kts`, `app/google-services.json` |
 
 **Desktop sign-in via QR code:** the QR code starts the FIDO *hybrid* protocol, which checks that
 the phone is physically near the computer over Bluetooth and then opens an encrypted tunnel. On
@@ -82,7 +82,7 @@ which offers this app's passkeys. So the app needs no extra code for QR sign-in,
 ./gradlew testGithubDebugUnitTest assembleGithubDebug   # debug APK in app/build/outputs/apk/github/debug/
 ```
 
-Debug builds use the package `io.github.amandhakar.passkey.debug` and have self-update turned off.
+Debug builds use the package `io.github.amandhakar.passkey.debug`.
 
 ## Releasing
 
@@ -138,8 +138,8 @@ Each demo release carries the `assetlinks.json` for its signing key; if the key 
 `demo-login` and redeploy. Run the *Demo release* workflow with *rp_id* to build the demo for another site.
 
 **Releasing the demo:** *Actions → Demo release → Run workflow*. It signs with the same key as Passkey Vault,
-tags `demo-vX.Y.Z` and publishes a **pre-release**, deliberately: Passkey Vault's updater follows the
-repository's *latest* release, which GitHub never takes from a pre-release.
+tags `demo-vX.Y.Z` and publishes a **pre-release**, deliberately: the demo's own updater follows the
+repository's *latest* release, which GitHub never takes from a pre-release, so it must not pick up a Passkey Vault release.
 
 ## Crypto Lab
 
@@ -151,24 +151,34 @@ channel: Wi-Fi or Bluetooth, paired by QR code or a 6-digit code. It is not used
 tags `cryptolab-vX.Y.Z` and publishes a **pre-release**, so neither Passkey Vault's updater nor the demo's ever
 picks it up. Crypto Lab doesn't update itself; install the newer APK over the old one.
 
+## Firebase (Crashlytics and Analytics)
+
+Both channels report crashes (Firebase Crashlytics) and anonymous usage statistics (Firebase Analytics) to the
+Firebase project in `app/google-services.json`; see [PRIVACY.md](PRIVACY.md). Debug and `minified` builds switch
+both off (manifest placeholder `telemetry`) and use a copy of the config for the `.debug` package in
+`app/src/debug/` and `app/src/minified/`; if you download a new `google-services.json`, update those too. The
+file holds Firebase's client API key, which ships in every APK and is not a secret, but restrict it to this app in
+*Google Cloud Console → Credentials* (Android apps, package `io.github.amandhakar.passkey` and the signing
+certificate's SHA-1).
+
 ## Release channels
 
 The same code (one branch) builds two variants, as Gradle product flavors:
 
 | Channel | Variant | Updates | How to release |
 |---|---|---|---|
-| **GitHub** (sideload) | `github` | the app updates itself from GitHub Releases | *Actions → Release* |
-| **Google Play / Indus Appstore** | `store` | by the store; no self-updater, no install-packages permission | release on GitHub first, then *Actions → Store release* (builds that version as a signed `.aab` + `.apk`) |
+| **GitHub** (sideload / private app store) | `github` | none in the app: the private app store (or a manual install) delivers new APKs | *Actions → Release* |
+| **Google Play / Indus Appstore** | `store` | by the store; no install-packages permission | release on GitHub first, then *Actions → Store release* (builds that version as a signed `.aab` + `.apk`) |
 
 Store builds also block screenshots, screen recording and the Recents preview, because the app's
 screens list the sites you have passkeys for. GitHub builds allow them, for bug reports.
 
-The store variant doesn't just switch the updater off. The updater, its permissions and WorkManager
-live in `app/src/github/`, which the store build never compiles. The store build gets only a stub
-(`app/src/store/`). `scripts/check-store-build.sh` runs in CI and in *Store release*. It fails if the
-store APK/AAB contains the install-packages or notification permission, the updater classes, the
-package installer, WorkManager or the GitHub API. To prove the check itself works, it also checks
-that the same things *are* found in the GitHub build.
+Neither channel can update itself. The store variant also leaves out the GitHub-only extras (moving
+passkeys, Backup & recovery, and with them the notification permission and WorkManager): they live in
+`app/src/github/`, which the store build never compiles. `scripts/check-store-build.sh` runs in CI and in
+*Store release*. It fails if any APK/AAB contains the install-packages permission, the old updater classes,
+the package installer or the GitHub API, or if the store build contains the notification permission or
+WorkManager. To prove the check itself works, it also checks that the GitHub build *does* contain the extras.
 
 **Uploading to Indus Appstore from GitHub:** tick *Upload to Indus Appstore* when running *Store release*
 and it sends the store APK to Indus as an update, with your release notes. One-time setup: create an API
@@ -192,11 +202,9 @@ date updates itself.
 2. Tap **Passkey settings** in the app. It opens *Passwords, passkeys & accounts*; the name differs
    between phone makers. There, turn the app on and pick **Passkey Vault** as the preferred
    service.
-3. Updates: the app checks GitHub once a day and shows a notification when a new version is out.
-   You can also check from the app's main screen. The first time, Android asks you to let the app
-   install updates.
-   - The download is checked against the SHA-256 that GitHub reports.
-   - Android also refuses any APK that isn't signed with the same key as the installed app.
+3. Updates: the app does not update itself. Install the newer APK from the latest release, or get it
+   through the private app store. Android refuses any APK that isn't signed with the same key as the
+   installed app.
 
 ## Troubleshooting
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "234868544663",
+    "project_id": "private-app-store-c2220",
+    "storage_bucket": "private-app-store-c2220.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:234868544663:android:6260211f322dea59c085d2",
+        "android_client_info": {
+          "package_name": "io.github.amandhakar.passkey.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEVJ54hI0inqzMfZ3W3zIg1g3LxD49Kv8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

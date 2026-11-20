@@ -129,7 +129,7 @@ def act(nodes):
 def main():
     os.makedirs(OUT, exist_ok=True)
     print(run("install", "-r", APK))
-    # The minified build has the self-updater on, which asks for this at launch; the dialog would cover the sheet.
+    # Keeps any notification-permission dialog from covering the sheet.
     shell(f"pm grant {PKG} android.permission.POST_NOTIFICATIONS")
     print("set PIN:", shell(f"locksettings set-pin {PIN}").strip())
     shell(f"settings put secure credential_service {SERVICE}")

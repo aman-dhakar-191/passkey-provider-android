@@ -38,9 +38,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -62,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import io.github.amandhakar.passkey.BuildConfig
 import io.github.amandhakar.passkey.data.Passkey
 import io.github.amandhakar.passkey.data.PasskeyGroups
-import io.github.amandhakar.passkey.update.Release
 import kotlinx.coroutines.flow.StateFlow
 import java.text.DateFormat
 import java.util.Date
@@ -78,16 +75,12 @@ fun MainScreen(
     passkeysFlow: StateFlow<List<Passkey>>,
     problemsFlow: StateFlow<String?>,
     providerEnabled: Boolean,
-    updateState: UpdateState,
-    updatesEnabled: Boolean,
     versionName: String,
     onOpenProviderSettings: () -> Unit,
     onScanQr: () -> Unit,
     onSelfTest: () -> Unit,
     onDelete: (Passkey) -> Unit,
     onRename: (Passkey, String) -> Unit,
-    onCheckUpdate: () -> Unit,
-    onInstallUpdate: (Release) -> Unit,
     onCopyProblems: () -> Unit,
     onClearProblems: () -> Unit,
     /** GitHub build: moving passkeys to a new phone; null where the build doesn't have it. */
@@ -106,8 +99,6 @@ fun MainScreen(
     val groups = remember(passkeys, query) { PasskeyGroups.of(passkeys, query) }
     val lastEntry = log?.substringBefore("\n----------")
     val lastFailed = lastEntry?.contains("FAILED") == true
-    val updateNeedsAttention = updateState is UpdateState.Available || updateState is UpdateState.Downloading ||
-        updateState is UpdateState.Installing
 
     Scaffold(
         topBar = {
@@ -138,7 +129,7 @@ fun MainScreen(
                             onClick = { menuOpen = false; showPhoneHelp = true },
                         )
                         DropdownMenuItem(
-                            text = { Text(if (updatesEnabled) "About & updates" else "About") },
+                            text = { Text("About") },
                             onClick = { menuOpen = false; showAbout = true },
                         )
                         if (BuildConfig.SELF_TEST) {
@@ -171,9 +162,6 @@ fun MainScreen(
                         onAction = { showLog = true },
                     )
                 }
-            }
-            if (updatesEnabled && updateNeedsAttention) {
-                item { UpdatePanel(updateState, versionName, onCheckUpdate, onInstallUpdate) }
             }
             item {
                 Text(
@@ -344,7 +332,6 @@ fun MainScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp),
                     )
-                    if (updatesEnabled) UpdatePanel(updateState, versionName, onCheckUpdate, onInstallUpdate, inDialog = true)
                 }
             },
             confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
@@ -468,49 +455,6 @@ private fun Banner(text: String, action: String, onAction: () -> Unit) {
             )
             TextButton(onClick = onAction) { Text(action) }
         }
-    }
-}
-
-@Composable
-private fun UpdatePanel(
-    state: UpdateState,
-    versionName: String,
-    onCheck: () -> Unit,
-    onInstall: (Release) -> Unit,
-    inDialog: Boolean = false,
-) {
-    val content = @Composable {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            when (state) {
-                UpdateState.Idle -> OutlinedButton(onClick = onCheck) { Text("Check for updates") }
-                UpdateState.Checking -> Text("Checking for updates...")
-                UpdateState.UpToDate -> {
-                    Text("You have the latest version ($versionName).")
-                    OutlinedButton(onClick = onCheck) { Text("Check again") }
-                }
-                is UpdateState.Available -> {
-                    Text("Version ${state.release.version} is available.", style = MaterialTheme.typography.titleSmall)
-                    if (state.release.notes.isNotBlank()) {
-                        Text(state.release.notes.take(300), style = MaterialTheme.typography.bodySmall)
-                    }
-                    Button(onClick = { onInstall(state.release) }) { Text("Download and install") }
-                }
-                is UpdateState.Downloading -> {
-                    Text("Downloading ${state.release.version}... ${(state.progress * 100).toInt()}%")
-                    LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
-                }
-                UpdateState.Installing -> Text("Installing...")
-                is UpdateState.Error -> {
-                    Text(state.message, color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = onCheck) { Text("Try again") }
-                }
-            }
-        }
-    }
-    if (inDialog) {
-        content()
-    } else {
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { content() } }
     }
 }
 

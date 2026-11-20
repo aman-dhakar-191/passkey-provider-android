@@ -1,0 +1,10 @@
+# Firebase's client config holds an API key that ships inside every APK, so it is not a secret. Restrict
+# it to the app in Google Cloud Console instead (see README.md, "Firebase").
+# Uses the single [allowlist] table: the gitleaks-action pinned in security.yml runs gitleaks 8.24, which
+# does not know [[allowlists]].
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Firebase client config (public by design)"
+paths = ['''app/(src/[a-z]+/)?google-services\.json''']
