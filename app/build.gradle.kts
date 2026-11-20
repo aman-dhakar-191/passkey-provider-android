@@ -1,6 +1,10 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 // Version comes from the git tag in CI (-PappVersionName=1.2.3). versionCode is derived from it so
@@ -31,6 +35,9 @@ android {
         versionName = appVersionName
         // The in-app passkey self-test and its reserved RP ID; never in release builds.
         buildConfigField("boolean", "SELF_TEST", "false")
+        // Firebase Analytics and Crashlytics report only from release builds (both channels). Debug and
+        // minified builds (emulator CI, local runs) switch them off in the manifest, before Firebase starts.
+        manifestPlaceholders["telemetry"] = "true"
     }
 
     signingConfigs {
@@ -62,6 +69,7 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             buildConfigField("boolean", "SELF_TEST", "true")
+            manifestPlaceholders["telemetry"] = "false"
         }
         // Release's R8 settings with the debug package, debug key and the self-test. Not debuggable, since
         // R8 skips its optimizations for debuggable builds and this must behave like release.
@@ -73,6 +81,10 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             matchingFallbacks += "debug"
+            // Never upload this CI-only build's R8 mapping to Crashlytics.
+            configure<CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
 
@@ -132,6 +144,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.biometric)
+    // Crash reports and usage statistics (both channels); see PRIVACY.md.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
     "githubImplementation"(libs.androidx.work.runtime.ktx) // only the self-updater uses WorkManager
     // Moving passkeys to a new phone: the secure channel (shared with Crypto Lab) and drawing the QR code.
     "githubImplementation"(project(":securechannel"))

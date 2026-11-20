@@ -23,6 +23,7 @@ Requires **Android 14 (API 34) or newer**, with a screen lock set up.
 | Private keys (Android Keystore / StrongBox; they never leave the device, except movable passkeys below) | `crypto/PasskeyKeys.kt` |
 | Moving passkeys to a new phone (GitHub build only, opt-in) | `app/src/github/.../transfer/`, `securechannel/` |
 | Backup & recovery with keepers (GitHub build only) | `app/src/github/.../recovery/` |
+| Crash reports and usage statistics (both channels; Firebase, off in debug builds) | `app/build.gradle.kts`, `app/google-services.json` |
 | Self-update from GitHub Releases (GitHub build only) | `app/src/github/.../update/` |
 
 **Desktop sign-in via QR code:** the QR code starts the FIDO *hybrid* protocol, which checks that
@@ -150,6 +151,16 @@ channel: Wi-Fi or Bluetooth, paired by QR code or a 6-digit code. It is not used
 **Releasing Crypto Lab:** *Actions → Crypto Lab release → Run workflow*. Like the demo, it signs with the same key,
 tags `cryptolab-vX.Y.Z` and publishes a **pre-release**, so neither Passkey Vault's updater nor the demo's ever
 picks it up. Crypto Lab doesn't update itself; install the newer APK over the old one.
+
+## Firebase (Crashlytics and Analytics)
+
+Both channels report crashes (Firebase Crashlytics) and anonymous usage statistics (Firebase Analytics) to the
+Firebase project in `app/google-services.json`; see [PRIVACY.md](PRIVACY.md). Debug and `minified` builds switch
+both off (manifest placeholder `telemetry`) and use a copy of the config for the `.debug` package in
+`app/src/debug/` and `app/src/minified/`; if you download a new `google-services.json`, update those too. The
+file holds Firebase's client API key, which ships in every APK and is not a secret, but restrict it to this app in
+*Google Cloud Console → Credentials* (Android apps, package `io.github.amandhakar.passkey` and the signing
+certificate's SHA-1).
 
 ## Release channels
 
