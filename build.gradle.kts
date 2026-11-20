@@ -10,6 +10,8 @@ buildscript {
         "org.apache.commons:commons-lang3" to "3.20.0",
         "org.apache.httpcomponents:httpclient" to "4.5.14",
         "org.apache.httpcomponents:httpmime" to "4.5.14",
+        // Pulled in by the Firebase Crashlytics and google-services Gradle plugins (31.1-android).
+        "com.google.guava:guava" to "33.8.0-android",
     )
     configurations.classpath {
         resolutionStrategy.eachDependency {
@@ -33,6 +35,7 @@ val fixed = mapOf(
     "org.apache.commons:commons-lang3" to "3.20.0",
     "org.apache.httpcomponents:httpclient" to "4.5.14",
     "org.apache.httpcomponents:httpmime" to "4.5.14",
+    "com.google.guava:guava" to "33.8.0-android",
 )
 
 allprojects {
