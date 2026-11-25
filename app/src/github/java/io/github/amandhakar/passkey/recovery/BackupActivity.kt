@@ -121,6 +121,15 @@ class BackupActivity : FragmentActivity() {
 
     private val store by lazy { RecoveryStore.get(this) }
 
+    // The reminder when a keeper's check is due is a notification; ask once a backup exists.
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    private fun askForNotifications() {
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Screenshots are allowed here (GitHub build, for testing and bug reports), like the rest of this build;
@@ -304,6 +313,7 @@ class BackupActivity : FragmentActivity() {
         }
         store.update { BackupSet(setId, now(), wrapped) }
         BackupReminderWorker.schedule(this)
+        askForNotifications()
         note(true, "Backup set up. Next: Back up now, then add keepers (Google, a printed card, someone you trust).")
     }
 

@@ -43,8 +43,8 @@ apps you sign in to, and the store you installed from. We don't control these se
 responsible for them, their availability or their changes. Their own terms apply.
 
 ## 7. Updates and availability
-We may update, change or stop offering the app at any time. The GitHub version updates itself only after
-you confirm; store versions are updated by the store. Keeping the app up to date helps keep you safe.
+We may update, change or stop offering the app at any time. Updates come from the store you installed the
+app from; the app doesn't update itself. Keeping the app up to date helps keep you safe.
 
 ## 8. No warranty
 The app is provided **"as is" and "as available"**, without warranties of any kind, express or implied,

@@ -11,8 +11,6 @@ val appVersionCode = appVersionName.substringBefore('-').split('.')
     .let { it + List(3) { 0 } }
     .let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
 
-val updateRepo = (findProperty("updateRepo") as String?) ?: "aman-dhakar-191/passkey-provider-android"
-
 // Release signing keys come from the environment (GitHub Actions secrets). The same key must sign every
 // release, otherwise Android refuses to install the update over the existing app.
 val signingKeystore: String? = System.getenv("SIGNING_KEYSTORE_PATH")
@@ -77,18 +75,18 @@ android {
     }
 
     // Two release channels from the same code (src/main is shared):
-    //  - github: sideloaded from GitHub Releases. src/github adds the self-updater, its permissions
-    //            (REQUEST_INSTALL_PACKAGES, POST_NOTIFICATIONS) and WorkManager, and moving passkeys to a
-    //            new phone (src/github/java/.../transfer, a setting that is off by default).
-    //  - store:  Google Play / Indus Appstore, which deliver updates. src/store only has a stub, so the
-    //            store app contains no update code at all (checked by scripts/check-store-build.sh).
+    //  - github: from GitHub Releases or a private app store, which delivers updates (the app has no
+    //            self-updater). src/github adds moving passkeys to a new phone (src/github/java/.../transfer,
+    //            a setting that is off by default) and Backup & recovery (.../recovery), with WorkManager and
+    //            POST_NOTIFICATIONS for its reminders.
+    //  - store:  Google Play / Indus Appstore, which deliver updates. src/store only has stubs, so the store
+    //            app contains none of that (checked by scripts/check-store-build.sh).
     flavorDimensions += "distribution"
     productFlavors {
         create("github") {
             dimension = "distribution"
             // Activity log: every step of every request (this is the channel used for debugging).
             buildConfigField("boolean", "LOG_ALL_REQUESTS", "true")
-            buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
             buildConfigField("boolean", "BLOCK_SCREENSHOTS", "false")
         }
         create("store") {
@@ -132,7 +130,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.biometric)
-    "githubImplementation"(libs.androidx.work.runtime.ktx) // only the self-updater uses WorkManager
+    "githubImplementation"(libs.androidx.work.runtime.ktx) // Backup & recovery's reminder
     // Moving passkeys to a new phone: the secure channel (shared with Crypto Lab) and drawing the QR code.
     "githubImplementation"(project(":securechannel"))
     "githubImplementation"(libs.zxing.core)
